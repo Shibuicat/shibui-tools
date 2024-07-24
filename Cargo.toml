@@ -1,0 +1,3 @@
+[workspace]
+members = ["shibui-vocab-data", "simple-server"]
+resolver = "2"

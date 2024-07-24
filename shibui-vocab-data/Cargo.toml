@@ -1,0 +1,9 @@
+[package]
+name = "shibui-vocab-data"
+description = "Shibui dictionary vocabulary fetcher"
+version = "0.1.0"
+authors = ["Do Tran", "quackablequackquack@gmail.com"]
+edition = "2021"
+
+[dependencies]
+
