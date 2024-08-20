@@ -1,4 +1,5 @@
 pub mod scraper;
+mod utils;
 use anyhow::Result;
 use scraper::cambridge_dictionary_scraper::CambridgeDictionaryScraper;
 

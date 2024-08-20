@@ -1,10 +1,15 @@
-pub struct HttpRequestMaker {
+pub trait HttpRequestMaker {
+    async fn get(&self, url: &str) -> anyhow::Result<String>;
+}
+
+pub struct DefaultHttpRequestMaker {
     client: reqwest::Client,
 }
 
-impl HttpRequestMaker {
-    async fn get(word: &str) -> anyhow::Result<String> {
-        todo!()
+impl DefaultHttpRequestMaker {
+    pub async fn get(&self, url: &str) -> anyhow::Result<String> {
+        let result = self.client.get(url).send().await?.text().await?;
+        Ok(result)
     }
 
     pub fn new() -> Self {

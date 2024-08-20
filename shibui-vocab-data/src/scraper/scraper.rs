@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 pub trait Scraper {
-    async fn fetch(word: String) -> Result<Option<WordDefinition>>;
+    async fn fetch(&self, word: String) -> Result<Option<WordDefinition>>;
 }
 
 pub struct WordDefinition {
