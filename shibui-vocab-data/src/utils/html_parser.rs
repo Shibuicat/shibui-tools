@@ -1,11 +1,21 @@
+use crate::scraper::scraper::WordDefinition;
+
 pub trait HtmlParser {
-    fn parse<T>(&self, html_content: &str) -> anyhow::Result<T>;
+    type Output;
+    fn parse(&self, html_content: &str) -> anyhow::Result<Self::Output>;
 }
 
-pub struct DefaultHtmlParser {}
+pub struct CambridgeHtmlParser {}
 
-impl HtmlParser for DefaultHtmlParser {
-    fn parse<T>(&self, html_content: &str) -> anyhow::Result<T> {
+impl CambridgeHtmlParser {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl HtmlParser for CambridgeHtmlParser {
+    type Output = WordDefinition;
+    fn parse(&self, html_content: &str) -> anyhow::Result<Self::Output> {
         todo!()
     }
 }

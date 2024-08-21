@@ -1,21 +1,24 @@
+use std::future::Future;
+
 use anyhow::Result;
-use std::collections::HashMap;
 
 pub trait Scraper {
-    async fn fetch(&self, word: String) -> Result<Option<WordDefinition>>;
+    fn fetch(&self, word: &str) -> impl Future<Output = Result<Option<WordDefinition>>>;
 }
 
 pub struct WordDefinition {
     word: String,
-    word_type: Vec<WordType>,
+    uk_pronounce_link: String,
+    us_pronounce_link: String,
+    type_definition: Vec<WordTypeDefinition>,
 }
 
-pub struct WordType {
-    pub word_type: WordTypeType,
-    pub example: Option<HashMap<WordTypeType, Option<Vec<WordUsageExample>>>>,
+pub struct WordTypeDefinition {
+    pub word_type: WordType,
+    pub example: Option<Vec<WordUsageExample>>,
 }
 
-pub enum WordTypeType {
+pub enum WordType {
     Noun,
     Verb,
     Adverb,
@@ -24,6 +27,6 @@ pub enum WordTypeType {
 }
 
 pub struct WordUsageExample {
-    pub sentence: String,
+    pub example_sentence: String,
     pub meaning: String,
 }

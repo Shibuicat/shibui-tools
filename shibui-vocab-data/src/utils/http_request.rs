@@ -1,5 +1,7 @@
+use std::future::Future;
+
 pub trait HttpRequestMaker {
-    async fn get(&self, url: &str) -> anyhow::Result<String>;
+    fn get(&self, url: &str) -> impl Future<Output = anyhow::Result<String>>;
 }
 
 pub struct DefaultHttpRequestMaker {
@@ -7,14 +9,16 @@ pub struct DefaultHttpRequestMaker {
 }
 
 impl DefaultHttpRequestMaker {
-    pub async fn get(&self, url: &str) -> anyhow::Result<String> {
-        let result = self.client.get(url).send().await?.text().await?;
-        Ok(result)
-    }
-
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
         }
+    }
+}
+
+impl HttpRequestMaker for DefaultHttpRequestMaker {
+    async fn get(&self, url: &str) -> anyhow::Result<String> {
+        let result = self.client.get(url).send().await?.text().await?;
+        Ok(result)
     }
 }
