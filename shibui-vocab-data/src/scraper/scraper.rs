@@ -1,9 +1,7 @@
-use std::future::Future;
-
 use anyhow::Result;
 
 pub trait Scraper {
-    fn fetch(&self, word: &str) -> impl Future<Output = Result<Option<WordDefinition>>>;
+    async fn fetch(&self, word: &str) -> Result<Option<WordDefinition>>;
 }
 
 pub struct WordDefinition {

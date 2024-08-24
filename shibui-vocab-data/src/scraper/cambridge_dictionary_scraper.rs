@@ -1,6 +1,6 @@
 use super::scraper::{Scraper, WordDefinition};
 use crate::utils::{html_parser::HtmlParser, http_request::HttpRequestMaker};
-use serde::Deserialize;
+// use serde::Deserialize;
 
 pub struct CambridgeDictionaryScraper<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
 {
@@ -19,7 +19,10 @@ impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
     }
 
     fn make_request_url(&self, word: &str) -> String {
-        return format!("{}{}", "https://dictionary.cambridge.org/", word);
+        return format!(
+            "{}{}",
+            "https://dictionary.cambridge.org/dictionary/english/", word
+        );
     }
 
     // fn make_suggest_request_url(&self, word: &str) -> String {
@@ -42,17 +45,20 @@ impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>> Scraper
 {
     async fn fetch(&self, word: &str) -> anyhow::Result<Option<WordDefinition>> {
         let fetch_url = self.make_request_url(word);
-        let html_content = self.request_maker.get(&fetch_url).await?;
+        dbg!(&fetch_url);
+        // let html_content = self.request_maker.get(&fetch_url).await?;
 
-        let result = self.html_parser.parse(&html_content)?;
+        // dbg!(html_content);
+        // let result = self.html_parser.parse(&html_content)?;
 
-        Ok(Some(result))
+        Ok(None)
+        // Ok(Some(result))
     }
 }
 
-#[derive(Deserialize)]
-struct WordSuggestion {
-    pub word: String,
-    pub url: String,
-    pub beta: bool,
-}
+// #[derive(Deserialize)]
+// struct WordSuggestion {
+//     pub word: String,
+//     pub url: String,
+//     pub beta: bool,
+// }
