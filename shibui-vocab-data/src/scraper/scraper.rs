@@ -5,18 +5,24 @@ pub trait Scraper {
 }
 
 pub struct WordDefinition {
-    word: String,
-    uk_pronounce_link: String,
-    us_pronounce_link: String,
-    type_definition: Vec<WordTypeDefinition>,
+    pub word: String,
+    pub uk_pronounce_link: String,
+    pub us_pronounce_link: String,
+    pub classes: Vec<WordClass>,
 }
 
-pub struct WordTypeDefinition {
-    pub word_type: WordType,
+pub struct WordClass {
+    pub class: Class,
+    pub definitions: Vec<ClassDefinition>,
+}
+
+pub struct ClassDefinition {
+    pub short_meaning: Option<String>,
+    pub explaination: String,
     pub example: Option<Vec<WordUsageExample>>,
 }
 
-pub enum WordType {
+pub enum Class {
     Noun,
     Verb,
     Adverb,
