@@ -6,14 +6,23 @@ pub trait Scraper {
 
 pub struct WordDefinition {
     pub word: String,
-    pub uk_pronounce_link: String,
-    pub us_pronounce_link: String,
     pub classes: Vec<WordClass>,
+}
+pub struct WordPronounce {
+    pub region: Region,
+    pub ipa: String,
+    pub link: String,
+}
+
+pub enum Region {
+    US,
+    UK,
 }
 
 pub struct WordClass {
     pub class: Class,
     pub definitions: Vec<ClassDefinition>,
+    pub pronounces: Vec<WordPronounce>,
 }
 
 pub struct ClassDefinition {

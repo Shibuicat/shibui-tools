@@ -1,5 +1,5 @@
 use super::scraper::{Scraper, WordDefinition};
-use crate::utils::{html_parser::HtmlParser, http_request::HttpRequestMaker};
+use crate::utils::http_request::HttpRequestMaker;
 // use serde::Deserialize;
 
 pub struct CambridgeDictionaryScraper<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
