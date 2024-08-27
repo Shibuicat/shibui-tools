@@ -7,7 +7,9 @@ mod utils;
 use anyhow::Result;
 // use clap::{Parser, Subcommand};
 use scraper::cambridge_dictionary_scraper::CambridgeDictionaryScraper;
-use utils::{html_parser::CambridgeHtmlParser, http_request::DefaultHttpRequestMaker};
+use utils::{
+    html_parser::cambridge_parser::CambridgeHtmlParser, http_request::DefaultHttpRequestMaker,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
