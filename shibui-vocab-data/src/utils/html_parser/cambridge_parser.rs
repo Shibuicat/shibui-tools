@@ -1,10 +1,7 @@
-use anyhow::{anyhow, Result};
-use scraper::{ElementRef, Html, Selector};
+use anyhow::anyhow;
+use scraper::{Html, Selector};
 
-use crate::{
-    scraper::scraper::{WordClass, WordDefinition, WordPronounce},
-    utils::html_parser::{cambridge_elements::WordPage, cambridge_parser},
-};
+use crate::{scraper::scraper::WordDefinition, utils::html_parser::cambridge_elements::WordPage};
 
 use super::HtmlParser;
 
@@ -28,11 +25,9 @@ impl CambridgeHtmlParser {
 impl HtmlParser for CambridgeHtmlParser {
     type Output = WordDefinition;
     fn parse(&self, html_content: &str) -> anyhow::Result<Self::Output> {
-        //word class class="pr entry-body__el"
-        // let uk_pronounce_selector = Selector::parse(".uk.dpron-i");
-        // let us_pronounce_selector = Selector::parse(".us.dpron-i");
         let html_doc = Html::parse_document(html_content);
         let word_page = WordPage::new(&html_doc);
-        word_page.
+        let word = word_page?.get_word_definition()?;
+        Ok(word)
     }
 }
