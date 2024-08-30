@@ -30,10 +30,10 @@ impl<'a> WordPage<'a> {
         let word = word_classes.first().unwrap().get_current_word();
         let word_definition = WordDefinition {
             word,
-            classes: word_classes
-                .iter()
-                .map(|class| class.get_word_class_definition())
-                .collect(),
+            classes: vec![], // classes: word_classes
+                             //     .iter()
+                             //     .map(|class| class.get_word_class_definition())
+                             //     .collect(),
         };
 
         Ok(word_definition)

@@ -18,7 +18,8 @@ async fn main() -> Result<()> {
     let request_maker = DefaultHttpRequestMaker::new();
     let html_parser = CambridgeHtmlParser::new();
     let fetcher = CambridgeDictionaryScraper::new(request_maker, html_parser);
-    fetcher.fetch("hello").await?;
+    let word_definition = fetcher.fetch("change").await?;
+    dbg!(word_definition);
     Ok(())
 }
 
