@@ -1,7 +1,9 @@
 use anyhow::bail;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
-use crate::scraper::scraper::{Class, ClassDefinition, WordClass, WordDefinition, WordPronounce};
+use crate::scraper::scraper::{
+    Class, ClassDefinition, Region, WordClass, WordDefinition, WordPronounce,
+};
 
 pub struct WordPage<'a> {
     pub content: &'a Html,
@@ -30,10 +32,10 @@ impl<'a> WordPage<'a> {
         let word = word_classes.first().unwrap().get_current_word();
         let word_definition = WordDefinition {
             word,
-            classes: vec![], // classes: word_classes
-                             //     .iter()
-                             //     .map(|class| class.get_word_class_definition())
-                             //     .collect(),
+            classes: word_classes
+                .iter()
+                .map(|class| class.get_word_class_definition())
+                .collect(),
         };
 
         Ok(word_definition)
@@ -61,11 +63,13 @@ impl<'a> WordClassSection<'a> {
 
     pub fn get_word_class_definition(&self) -> WordClass {
         let header = self.header();
-        let definitions = self.definitions();
+        // let definitions = self.definitions();
         WordClass {
             class: header.get_class(),
-            pronounces: header.get_pronounces(),
-            definitions: definitions.iter().map(|x| x.get_definition()).collect(),
+            pronounces: vec![],
+            // pronounces: header.get_pronounces(),
+            // definitions: definitions.iter().map(|x| x.get_definition()).collect(),
+            definitions: vec![],
         }
     }
 
@@ -107,10 +111,42 @@ impl<'a> WordClassHeaderSection<'a> {
     }
 
     pub fn get_class(&self) -> Class {
-        todo!()
+        let selector = Selector::parse(".pos.dpos").unwrap();
+        let class_ele = self.inner_html_ele.select(&selector).next().unwrap();
+        let text = class_ele.text().next().unwrap();
+        text.into()
     }
 
     pub fn get_pronounces(&self) -> Vec<WordPronounce> {
+        let result = vec![
+            WordPronounce {
+                link: self.get_uk_sound_link(),
+                ipa: self.get_uk_ipa(),
+                region: Region::UK,
+            },
+            WordPronounce {
+                ipa: self.get_us_ipa(),
+                link: self.get_us_sound_link(),
+                region: Region::US,
+            },
+        ];
+
+        result
+    }
+
+    fn get_uk_sound_link(&self) -> String {
+        todo!()
+    }
+
+    fn get_us_sound_link(&self) -> String {
+        todo!()
+    }
+
+    fn get_uk_ipa(&self) -> String {
+        todo!()
+    }
+
+    fn get_us_ipa(&self) -> String {
         todo!()
     }
 }

@@ -46,7 +46,20 @@ pub enum Class {
     Adverb,
     Adjective,
     Pronounce,
-    Compound(Vec<Class>),
+    Undefined(String),
+}
+
+impl From<&str> for Class {
+    fn from(value: &str) -> Self {
+        match value {
+            "verb" => Self::Verb,
+            "noun" => Self::Noun,
+            "adverb" => Self::Adverb,
+            "adjective" => Self::Adjective,
+            "pronounce" => Self::Pronounce,
+            _ => Self::Undefined(value.to_owned()),
+        }
+    }
 }
 
 #[derive(Debug)]
