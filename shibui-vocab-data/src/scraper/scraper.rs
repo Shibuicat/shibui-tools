@@ -1,7 +1,9 @@
+use std::future::Future;
+
 use anyhow::Result;
 
 pub trait Scraper {
-    async fn fetch(&self, word: &str) -> Result<Option<WordDefinition>>;
+    fn fetch(&self, word: &str) -> impl Future<Output = Result<Option<WordDefinition>>>;
 }
 
 #[derive(Debug)]
@@ -44,6 +46,7 @@ pub enum Class {
     Adverb,
     Adjective,
     Pronounce,
+    Compound(Vec<Class>),
 }
 
 #[derive(Debug)]
