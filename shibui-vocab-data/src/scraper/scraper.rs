@@ -34,9 +34,19 @@ pub struct WordClass {
 
 #[derive(Debug)]
 pub struct ClassDefinition {
-    pub short_meaning: Option<String>,
-    pub explaination: String,
-    pub example: Option<Vec<WordUsageExample>>,
+    pub contexts: Vec<WordContext>,
+}
+
+#[derive(Debug)]
+pub struct WordContext {
+    pub description: String,
+    pub meanings: Vec<WordExplanation>,
+}
+
+#[derive(Debug)]
+pub struct WordExplanation {
+    pub explanation: String,
+    pub examples: Vec<WordUsageExample>,
 }
 
 #[derive(Debug)]
@@ -46,6 +56,7 @@ pub enum Class {
     Adverb,
     Adjective,
     Pronounce,
+    Determiner,
     Undefined(String),
 }
 
@@ -57,6 +68,7 @@ impl From<&str> for Class {
             "adverb" => Self::Adverb,
             "adjective" => Self::Adjective,
             "pronounce" => Self::Pronounce,
+            "determiner" => Self::Determiner,
             _ => Self::Undefined(value.to_owned()),
         }
     }

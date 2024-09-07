@@ -2,7 +2,7 @@ use anyhow::bail;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
 use crate::scraper::scraper::{
-    Class, ClassDefinition, Region, WordClass, WordDefinition, WordPronounce,
+    Class, ClassDefinition, Region, WordClass, WordContext, WordDefinition, WordPronounce,
 };
 
 pub struct WordPage<'a> {
@@ -63,13 +63,15 @@ impl<'a> WordClassSection<'a> {
 
     pub fn get_word_class_definition(&self) -> WordClass {
         let header = self.header();
-        // let definitions = self.definitions();
+
         WordClass {
             class: header.get_class(),
-            pronounces: vec![],
-            // pronounces: header.get_pronounces(),
-            // definitions: definitions.iter().map(|x| x.get_definition()).collect(),
-            definitions: vec![],
+            pronounces: header.get_pronounces(),
+            definitions: self
+                .definitions()
+                .iter()
+                .map(|x| x.get_definition())
+                .collect(),
         }
     }
 
@@ -118,36 +120,69 @@ impl<'a> WordClassHeaderSection<'a> {
     }
 
     pub fn get_pronounces(&self) -> Vec<WordPronounce> {
-        let result = vec![
-            WordPronounce {
-                link: self.get_uk_sound_link(),
-                ipa: self.get_uk_ipa(),
+        let mut result = vec![];
+
+        let uk_ipa = self.get_uk_ipa();
+
+        if uk_ipa.is_some() {
+            result.push(WordPronounce {
+                ipa: uk_ipa.unwrap(),
+                link: self.get_uk_sound_link().unwrap(),
                 region: Region::UK,
-            },
-            WordPronounce {
-                ipa: self.get_us_ipa(),
-                link: self.get_us_sound_link(),
-                region: Region::US,
-            },
-        ];
+            })
+        }
+
+        result.push(WordPronounce {
+            ipa: self.get_us_ipa().map_or_else(|| "".to_string(), |x| x),
+            link: self.get_us_sound_link(),
+            region: Region::US,
+        });
 
         result
     }
 
-    fn get_uk_sound_link(&self) -> String {
-        todo!()
+    fn get_uk_sound_link(&self) -> Option<String> {
+        let selector = Selector::parse("audio source").unwrap();
+        let source_tag = self.inner_html_ele.select(&selector).next();
+        if source_tag.is_some() {
+            let src = source_tag.unwrap().attr("src").unwrap();
+
+            return Some(src.to_string());
+        }
+
+        return None;
     }
 
     fn get_us_sound_link(&self) -> String {
-        todo!()
+        let selector = Selector::parse(".us.dpron-i audio source").unwrap();
+        let source_tag = self.inner_html_ele.select(&selector).next().unwrap();
+
+        let src = source_tag.attr("src").unwrap();
+        return src.to_string();
     }
 
-    fn get_uk_ipa(&self) -> String {
-        todo!()
+    fn get_uk_ipa(&self) -> Option<String> {
+        let selector = Selector::parse(".uk.dpron-i .ipa.dipa.lpr-2.lpl-1").unwrap();
+        let ipa = self.inner_html_ele.select(&selector).next();
+
+        if ipa.is_some() {
+            let ipa_text = ipa.unwrap().text().next().unwrap();
+
+            return Some(ipa_text.to_string());
+        }
+
+        return None;
     }
 
-    fn get_us_ipa(&self) -> String {
-        todo!()
+    fn get_us_ipa(&self) -> Option<String> {
+        let selector = Selector::parse(".us.dpron-i .ipa.dipa.lpr-2.lpl-1").unwrap();
+        let tag = self.inner_html_ele.select(&selector).next();
+        if tag.is_some() {
+            let ipa = tag.unwrap().text().next().unwrap();
+            return Some(ipa.to_string());
+        }
+
+        None
     }
 }
 
@@ -165,6 +200,47 @@ impl<'a> ClassDefinitionSection<'a> {
     }
 
     pub fn get_definition(&self) -> ClassDefinition {
+        ClassDefinition {
+            contexts: self.contexts().iter().map(|x| x.get_context()).collect(),
+        }
+    }
+
+    fn contexts(&'a self) -> Vec<ContextBlock<'a>> {
+        let selector = Selector::parse(".pr.dsense").unwrap();
+        let blocks = self
+            .inner_html_ele
+            .select(&selector)
+            .map(|x| ContextBlock::new(x, &self))
+            .collect();
+
+        blocks
+    }
+}
+
+pub struct ContextBlock<'a> {
+    pub inner_html_ele: ElementRef<'a>,
+    class_definition: &'a ClassDefinitionSection<'a>,
+}
+
+impl<'a> ContextBlock<'a> {
+    pub fn new(
+        inner_html_ele: ElementRef<'a>,
+        class_definition: &'a ClassDefinitionSection<'a>,
+    ) -> Self {
+        Self {
+            inner_html_ele,
+            class_definition,
+        }
+    }
+
+    pub fn get_context(&self) -> WordContext {
+        // WordContext{
+        //     description
+        // }
+        todo!()
+    }
+
+    fn get_context_description() -> String {
         todo!()
     }
 }
