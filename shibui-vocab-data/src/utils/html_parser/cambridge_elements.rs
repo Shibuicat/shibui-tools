@@ -250,7 +250,7 @@ impl<'a> ContextBlock<'a> {
     }
 
     fn get_context_description(&self) -> Option<String> {
-        let selector = Selector::parse(".guideword.dsense_gw").unwrap();
+        let selector = Selector::parse(".guideword.dsense_gw span").unwrap();
         let sample = self.inner_html_ele.select(&selector).next();
         if sample.is_none() {
             return None;
@@ -293,19 +293,20 @@ impl<'a> WordMeaningBlock<'a> {
     fn get_explanation(&self) -> String {
         let selector = Selector::parse(".def.ddef_d.db").unwrap();
 
-        // let sample = self.inner_html_ele.select(&selector).next();
-        // if sample.is_none() {
-        //     dbg!(&self.inner_html_ele);
-        // }
-
-        self.inner_html_ele
+        let text_iter = self
+            .inner_html_ele
             .select(&selector)
             .next()
             .unwrap()
             .text()
-            .next()
-            .unwrap()
-            .to_string()
+            .map(|x| x.to_string())
+            .join();
+        // text_iter.
+
+        // .next()
+        // .unwrap()
+        // .to_string()
+        todo!()
     }
 
     fn get_examples(&self) -> Vec<WordUsageExample> {
