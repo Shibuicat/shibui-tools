@@ -39,7 +39,7 @@ pub struct ClassDefinition {
 
 #[derive(Debug)]
 pub struct WordContext {
-    pub description: String,
+    pub description: Option<String>,
     pub meanings: Vec<WordExplanation>,
 }
 
@@ -75,7 +75,4 @@ impl From<&str> for Class {
 }
 
 #[derive(Debug)]
-pub struct WordUsageExample {
-    pub example_sentence: String,
-    pub meaning: String,
-}
+pub struct WordUsageExample(pub String);

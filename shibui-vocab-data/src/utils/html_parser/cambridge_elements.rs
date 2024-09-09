@@ -1,8 +1,9 @@
 use anyhow::bail;
-use scraper::{selectable::Selectable, ElementRef, Html, Selector};
+use scraper::{element_ref, selectable::Selectable, ElementRef, Html, Selector};
 
 use crate::scraper::scraper::{
-    Class, ClassDefinition, Region, WordClass, WordContext, WordDefinition, WordPronounce,
+    Class, ClassDefinition, Region, WordClass, WordContext, WordDefinition, WordExplanation,
+    WordPronounce, WordUsageExample,
 };
 
 pub struct WordPage<'a> {
@@ -76,7 +77,11 @@ impl<'a> WordClassSection<'a> {
     }
 
     pub fn definitions(&'a self) -> Vec<ClassDefinitionSection<'a>> {
-        todo!()
+        let selector = Selector::parse(".pos-body").unwrap();
+        self.inner_html_ele
+            .select(&selector)
+            .map(|x| ClassDefinitionSection::new(x, &self))
+            .collect()
     }
 
     pub fn header(&'a self) -> WordClassHeaderSection<'a> {
@@ -234,13 +239,89 @@ impl<'a> ContextBlock<'a> {
     }
 
     pub fn get_context(&self) -> WordContext {
-        // WordContext{
-        //     description
-        // }
-        todo!()
+        WordContext {
+            description: self.get_context_description(),
+            meanings: self
+                .word_meaning_blocks()
+                .iter()
+                .map(|x| x.get_meaning())
+                .collect(),
+        }
     }
 
-    fn get_context_description() -> String {
-        todo!()
+    fn get_context_description(&self) -> Option<String> {
+        let selector = Selector::parse(".guideword.dsense_gw").unwrap();
+        let sample = self.inner_html_ele.select(&selector).next();
+        if sample.is_none() {
+            return None;
+        }
+
+        let description = self
+            .inner_html_ele
+            .select(&selector)
+            .next()
+            .unwrap()
+            .text()
+            .next()
+            .unwrap();
+
+        Some(description.to_string())
+    }
+
+    fn word_meaning_blocks(&'a self) -> Vec<WordMeaningBlock<'a>> {
+        let selector = Selector::parse(".def-block.ddef_block").unwrap();
+        self.inner_html_ele
+            .select(&selector)
+            .map(|x| WordMeaningBlock::new(x, &self))
+            .collect()
+    }
+}
+
+struct WordMeaningBlock<'a> {
+    inner_html_ele: ElementRef<'a>,
+    context: &'a ContextBlock<'a>,
+}
+
+impl<'a> WordMeaningBlock<'a> {
+    pub fn new(inner_html_ele: ElementRef<'a>, context: &'a ContextBlock<'a>) -> Self {
+        Self {
+            inner_html_ele,
+            context,
+        }
+    }
+
+    fn get_explanation(&self) -> String {
+        let selector = Selector::parse(".def.ddef_d.db").unwrap();
+
+        // let sample = self.inner_html_ele.select(&selector).next();
+        // if sample.is_none() {
+        //     dbg!(&self.inner_html_ele);
+        // }
+
+        self.inner_html_ele
+            .select(&selector)
+            .next()
+            .unwrap()
+            .text()
+            .next()
+            .unwrap()
+            .to_string()
+    }
+
+    fn get_examples(&self) -> Vec<WordUsageExample> {
+        let selector = Selector::parse(".examp.dexamp").unwrap();
+        self.inner_html_ele
+            .select(&selector)
+            .map(|x| WordUsageExample {
+                0: x.text().next().unwrap().to_string(),
+            })
+            .collect()
+    }
+
+    pub fn get_meaning(&self) -> WordExplanation {
+        WordExplanation {
+            explanation: self.get_explanation(),
+            examples: self.get_examples(),
+        }
     }
 }
