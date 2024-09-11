@@ -1,0 +1,9 @@
+[package]
+name = "shibui_dic_crawler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7.5"
+tokio = {version = "1.40.0", features = ["full"]}
+shibui_vocab_data = {path = "../shibui_vocab_data"}

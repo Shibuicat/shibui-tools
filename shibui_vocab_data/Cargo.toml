@@ -1,9 +1,13 @@
 [package]
-name = "shibui-vocab-data"
+name = "shibui_vocab_data"
 description = "Shibui dictionary vocabulary fetcher"
 version = "0.1.0"
 authors = ["Do Tran", "quackablequackquack@gmail.com"]
 edition = "2021"
+
+[lib]
+name ="shibui_vocab_data"
+path = "src/lib.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
