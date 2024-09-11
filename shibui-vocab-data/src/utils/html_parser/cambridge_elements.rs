@@ -293,20 +293,15 @@ impl<'a> WordMeaningBlock<'a> {
     fn get_explanation(&self) -> String {
         let selector = Selector::parse(".def.ddef_d.db").unwrap();
 
-        let text_iter = self
-            .inner_html_ele
+        self.inner_html_ele
             .select(&selector)
             .next()
             .unwrap()
             .text()
-            .map(|x| x.to_string())
-            .join();
-        // text_iter.
-
-        // .next()
-        // .unwrap()
-        // .to_string()
-        todo!()
+            .fold("".to_string(), |mut acc, e| {
+                acc.push_str(e);
+                acc
+            })
     }
 
     fn get_examples(&self) -> Vec<WordUsageExample> {
@@ -314,7 +309,10 @@ impl<'a> WordMeaningBlock<'a> {
         self.inner_html_ele
             .select(&selector)
             .map(|x| WordUsageExample {
-                0: x.text().next().unwrap().to_string(),
+                0: x.text().fold("".to_owned(), |mut acc, e| {
+                    acc.push_str(e);
+                    acc
+                }),
             })
             .collect()
     }
