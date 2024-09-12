@@ -1,26 +1,10 @@
-use anyhow::anyhow;
-use scraper::{Html, Selector};
+use scraper::Html;
 
-use crate::{scraper::scraper::WordDefinition, utils::html_parser::cambridge_elements::WordPage};
+use crate::{scraper::WordDefinition, utils::html_parser::cambridge_elements::WordPage};
 
 use super::HtmlParser;
 
-pub struct CambridgeHtmlParser {}
-
-impl CambridgeHtmlParser {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn get_word_classes_selector() -> anyhow::Result<Selector> {
-        let selector_parse_result =
-            Selector::parse(".pr.entry-body__el").map_err(|err| err.to_string());
-        match selector_parse_result {
-            Ok(selector) => Ok(selector),
-            Err(err) => Err(anyhow!(err)),
-        }
-    }
-}
+pub struct CambridgeHtmlParser;
 
 impl HtmlParser for CambridgeHtmlParser {
     type Output = WordDefinition;

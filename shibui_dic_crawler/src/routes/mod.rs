@@ -1,1 +1,1 @@
-pub mod get;
+pub mod cambridge_dic;

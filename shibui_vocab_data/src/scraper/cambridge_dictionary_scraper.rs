@@ -1,10 +1,10 @@
-use super::scraper::{Scraper, WordDefinition};
+use crate::scraper::{Scraper, WordDefinition};
+use crate::utils::html_parser::cambridge_parser::CambridgeHtmlParser;
 use crate::utils::{html_parser::HtmlParser, http_request::HttpRequestMaker};
 
-pub struct CambridgeDictionaryScraper<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
-{
-    request_maker: T,
-    html_parser: T2,
+pub struct CambridgeDictionaryScraper {
+    request_maker: Box<dyn HttpRequestMaker>,
+    html_parser: Box<dyn HtmlParser<Output = WordDefinition>,
 }
 
 impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
@@ -12,8 +12,8 @@ impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
 {
     pub fn new(request_maker: T, html_parser: T2) -> Self {
         Self {
-            request_maker,
-            html_parser,
+            request_maker: Box::new(request_maker),
+            html_parser: Box::new(html_parser),
         }
     }
 

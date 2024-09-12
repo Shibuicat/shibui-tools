@@ -1,7 +1,7 @@
 use anyhow::bail;
-use scraper::{element_ref, selectable::Selectable, ElementRef, Html, Selector};
+use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
-use crate::scraper::scraper::{
+use crate::scraper::{
     Class, ClassDefinition, Region, WordClass, WordContext, WordDefinition, WordExplanation,
     WordPronounce, WordUsageExample,
 };
