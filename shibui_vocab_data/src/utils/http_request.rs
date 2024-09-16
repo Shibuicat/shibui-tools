@@ -6,6 +6,7 @@ pub trait HttpRequestMaker {
     fn get(&self, url: &str) -> impl Future<Output = anyhow::Result<String>>;
 }
 
+#[derive(Clone)]
 pub struct DefaultHttpRequestMaker {
     client: reqwest::Client,
 }

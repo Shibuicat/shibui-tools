@@ -1,19 +1,19 @@
-use crate::scraper::{Scraper, WordDefinition};
+use crate::scraper::WordDefinition;
 use crate::utils::html_parser::cambridge_parser::CambridgeHtmlParser;
+use crate::utils::http_request::DefaultHttpRequestMaker;
 use crate::utils::{html_parser::HtmlParser, http_request::HttpRequestMaker};
 
+#[derive(Clone)]
 pub struct CambridgeDictionaryScraper {
-    request_maker: Box<dyn HttpRequestMaker>,
-    html_parser: Box<dyn HtmlParser<Output = WordDefinition>,
+    request_maker: DefaultHttpRequestMaker,
+    html_parser: CambridgeHtmlParser,
 }
 
-impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
-    CambridgeDictionaryScraper<T, T2>
-{
-    pub fn new(request_maker: T, html_parser: T2) -> Self {
+impl CambridgeDictionaryScraper {
+    pub fn new() -> Self {
         Self {
-            request_maker: Box::new(request_maker),
-            html_parser: Box::new(html_parser),
+            request_maker: DefaultHttpRequestMaker::new(),
+            html_parser: CambridgeHtmlParser,
         }
     }
 
@@ -23,12 +23,8 @@ impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>>
             "https://dictionary.cambridge.org/dictionary/english/", word
         );
     }
-}
 
-impl<T: HttpRequestMaker, T2: HtmlParser<Output = WordDefinition>> Scraper
-    for CambridgeDictionaryScraper<T, T2>
-{
-    async fn fetch(&self, word: &str) -> anyhow::Result<Option<WordDefinition>> {
+    pub async fn fetch(&self, word: &str) -> anyhow::Result<Option<WordDefinition>> {
         let fetch_url = self.make_request_url(word);
         let fetch_result = self.request_maker.get(&fetch_url).await;
         if fetch_result.is_err() {

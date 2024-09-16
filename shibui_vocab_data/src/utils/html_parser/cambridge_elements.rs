@@ -66,7 +66,7 @@ impl<'a> WordClassSection<'a> {
         let header = self.header();
 
         WordClass {
-            class: header.get_class(),
+            class_name: header.get_class(),
             pronounces: header.get_pronounces(),
             definitions: self
                 .definitions()

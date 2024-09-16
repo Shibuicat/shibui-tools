@@ -1,5 +1,6 @@
 pub mod cambridge_dictionary_scraper;
 pub use cambridge_dictionary_scraper::CambridgeDictionaryScraper;
+use serde::Serialize;
 pub mod tratu_coviet;
 
 use std::future::Future;
@@ -10,50 +11,50 @@ pub trait Scraper {
     fn fetch(&self, word: &str) -> impl Future<Output = Result<Option<WordDefinition>>>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordDefinition {
     pub word: String,
     pub classes: Vec<WordClass>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordPronounce {
     pub region: Region,
     pub ipa: String,
     pub link: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum Region {
     US,
     UK,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordClass {
-    pub class: Class,
+    pub class_name: Class,
     pub definitions: Vec<ClassDefinition>,
     pub pronounces: Vec<WordPronounce>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ClassDefinition {
     pub contexts: Vec<WordContext>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordContext {
     pub description: Option<String>,
     pub meanings: Vec<WordExplanation>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordExplanation {
     pub explanation: String,
     pub examples: Vec<WordUsageExample>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum Class {
     Noun,
     Verb,
@@ -61,6 +62,7 @@ pub enum Class {
     Adjective,
     Pronounce,
     Determiner,
+    #[serde(untagged)]
     Undefined(String),
 }
 
@@ -78,5 +80,5 @@ impl From<&str> for Class {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct WordUsageExample(pub String);

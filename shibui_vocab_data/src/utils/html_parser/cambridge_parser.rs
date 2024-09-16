@@ -4,6 +4,7 @@ use crate::{scraper::WordDefinition, utils::html_parser::cambridge_elements::Wor
 
 use super::HtmlParser;
 
+#[derive(Clone)]
 pub struct CambridgeHtmlParser;
 
 impl HtmlParser for CambridgeHtmlParser {

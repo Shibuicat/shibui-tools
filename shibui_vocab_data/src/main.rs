@@ -10,9 +10,8 @@ use utils::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let request_maker = DefaultHttpRequestMaker::new();
-    let fetcher = CambridgeDictionaryScraper::new(request_maker, CambridgeHtmlParser);
-    let word_definition = fetcher.fetch("hello").await?;
-    dbg!(word_definition);
+    // let request_maker = DefaultHttpRequestMaker::new();
+    // let fetcher = CambridgeDictionaryScraper::new(request_maker, CambridgeHtmlParser);
+    // let word_definition = fetcher.fetch("hello").await?;
     Ok(())
 }
