@@ -31,6 +31,7 @@ pub enum Region {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WordClass {
     pub class_name: Class,
     pub definitions: Vec<ClassDefinition>,
@@ -62,6 +63,7 @@ pub enum Class {
     Adjective,
     Pronounce,
     Determiner,
+    Exclamation,
     #[serde(untagged)]
     Undefined(String),
 }
@@ -75,6 +77,7 @@ impl From<&str> for Class {
             "adjective" => Self::Adjective,
             "pronounce" => Self::Pronounce,
             "determiner" => Self::Determiner,
+            "exclamation" => Self::Exclamation,
             _ => Self::Undefined(value.to_owned()),
         }
     }

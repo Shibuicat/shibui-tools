@@ -15,6 +15,7 @@ pub async fn get_word(
     query: Query<WordQuery>,
     state: Arc<AppState>,
 ) -> Result<Json<WordDefinition>, String> {
+    println!("process request for word {}", query.0.word);
     let result = state
         .fetcher
         .fetch(query.0.word)
@@ -23,7 +24,9 @@ pub async fn get_word(
 
     if let Ok(word) = result {
         if word.is_some() {
-            return Ok(Json(word.unwrap()));
+            let word = word.unwrap();
+            println!("returned {:?}", &word);
+            return Ok(Json(word));
         }
         return Err("Word doesn't exist".to_string());
     }

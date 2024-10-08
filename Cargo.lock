@@ -1373,6 +1373,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "shibui-resume"
+version = "0.1.0"
+
+[[package]]
 name = "shibui_dic_crawler"
 version = "0.1.0"
 dependencies = [
