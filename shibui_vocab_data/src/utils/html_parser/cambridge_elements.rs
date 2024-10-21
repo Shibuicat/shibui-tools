@@ -13,7 +13,14 @@ pub struct WordPage<'a> {
 impl<'a> WordPage<'a> {
     //There is a possibility that the word does not exist.
     pub fn new(html: &'a Html) -> anyhow::Result<Self> {
-        Ok(Self { content: html })
+        //document.querySelector(".ddef_h .def.ddef_d.db .usage.dusage")
+        let init = Self { content: html };
+        if init.word_class_sections().len() == 0 {
+            bail!("Word doesn't exist");
+        }
+
+        println!("Len is {}", init.word_class_sections().len());
+        Ok(init)
     }
 
     fn word_class_sections(&'a self) -> Vec<WordClassSection<'a>> {
