@@ -19,6 +19,12 @@ impl<'a> WordPage<'a> {
             bail!("Word doesn't exist");
         }
 
+        let selector = Selector::parse(".ddef_h .def.ddef_d.db .usage.dusage").unwrap();
+        if init.content.select(&selector).count() == 1{
+            println!("other tense of the word found");
+           bail!("Word doesn't exist"); 
+        }
+
         println!("Len is {}", init.word_class_sections().len());
         Ok(init)
     }
