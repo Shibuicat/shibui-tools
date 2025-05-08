@@ -173,9 +173,12 @@ impl<'a> WordClassHeaderSection<'a> {
 
     fn get_us_sound_link(&self) -> String {
         let selector = Selector::parse(".us.dpron-i audio source").unwrap();
-        let source_tag = self.inner_html_ele.select(&selector).next().unwrap();
+        let source_tag = self.inner_html_ele.select(&selector).next();
+        if source_tag.is_none(){
+            return "".to_string();
+        }
 
-        let src = source_tag.attr("src").unwrap();
+        let src = source_tag.unwrap().attr("src").unwrap();
         return src.to_string();
     }
 
