@@ -15,15 +15,18 @@ impl<'a> WordPage<'a> {
     pub fn new(html: &'a Html) -> anyhow::Result<Self> {
         //document.querySelector(".ddef_h .def.ddef_d.db .usage.dusage")
         let init = Self { content: html };
-        if init.word_class_sections().len() == 0 {
+        
+         let word_class_count = init.word_class_sections().len(); 
+        if word_class_count == 0 {
             bail!("Word doesn't exist");
         }
 
-        let selector = Selector::parse(".ddef_h .def.ddef_d.db .usage.dusage").unwrap();
-        if init.content.select(&selector).count() == 1{
-            println!("other tense of the word found");
-           bail!("Word doesn't exist"); 
-        }
+        //commented out this section because i'm not sure if it's still holds true or not
+        // let selector = Selector::parse(".ddef_h .def.ddef_d.db .usage.dusage").unwrap();
+        // if init.content.select(&selector).count() == 1{
+        //     println!("other tense of the word found");
+        //     bail!("Word doesn't exist");
+        // }
 
         println!("Len is {}", init.word_class_sections().len());
         Ok(init)
@@ -174,7 +177,7 @@ impl<'a> WordClassHeaderSection<'a> {
     fn get_us_sound_link(&self) -> String {
         let selector = Selector::parse(".us.dpron-i audio source").unwrap();
         let source_tag = self.inner_html_ele.select(&selector).next();
-        if source_tag.is_none(){
+        if source_tag.is_none() {
             return "".to_string();
         }
 
