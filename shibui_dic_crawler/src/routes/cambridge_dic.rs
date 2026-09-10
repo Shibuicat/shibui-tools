@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::Query, Json};
+use axum::{extract::Query, http::StatusCode, Json};
 use serde::Deserialize;
 use shibui_vocab_data::scraper::WordDefinition;
 
@@ -14,22 +14,20 @@ pub struct WordQuery {
 pub async fn get_word(
     query: Query<WordQuery>,
     state: Arc<AppState>,
-) -> Result<Json<WordDefinition>, String> {
+) -> Result<Json<WordDefinition>, (StatusCode, String)> {
     println!("process request for word {}", query.0.word);
     let result = state
         .fetcher
         .fetch(query.0.word)
         .await
-        .map_err(|err| err.to_string());
+        .map_err(|err| (StatusCode::BAD_GATEWAY, err.to_string()));
 
-    if let Ok(word) = result {
-        if word.is_some() {
-            let word = word.unwrap();
+    match result {
+        Ok(Some(word)) => {
             println!("returned {:?}", &word);
-            return Ok(Json(word));
+            Ok(Json(word))
         }
-        return Err("Word doesn't exist".to_string());
+        Ok(None) => Err((StatusCode::NOT_FOUND, "Word doesn't exist".to_string())),
+        Err(err) => Err(err),
     }
-
-    Err(result.err().unwrap())
 }

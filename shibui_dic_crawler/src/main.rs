@@ -6,7 +6,13 @@ mod routes;
 
 #[tokio::main]
 async fn main() {
-    let cambridge_fetcher = Fetcher::new(CambridgeDictionaryScraper::new());
+    dotenvy::dotenv().ok();
+
+    let html_storage_dir =
+        std::env::var("HTML_STORAGE_DIR").unwrap_or_else(|_| "./html_storage".to_string());
+    println!("Storing fetched HTML under {html_storage_dir}");
+
+    let cambridge_fetcher = Fetcher::new(CambridgeDictionaryScraper::new(html_storage_dir));
     let shared_state = Arc::new(AppState {
         fetcher: cambridge_fetcher,
     });
