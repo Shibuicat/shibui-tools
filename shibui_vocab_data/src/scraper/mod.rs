@@ -15,6 +15,8 @@ pub trait Scraper {
 pub struct WordDefinition {
     pub word: String,
     pub classes: Vec<WordClass>,
+    #[serde(skip_serializing)]
+    pub extracted_html: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

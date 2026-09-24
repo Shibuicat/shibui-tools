@@ -1,6 +1,5 @@
 use std::fmt;
 use std::future::Future;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -56,6 +55,8 @@ struct FlareSolverrResponse {
     #[serde(default)]
     session: Option<String>,
     #[serde(default)]
+    sessions: Vec<String>,
+    #[serde(default)]
     solution: Option<FlareSolverrSolution>,
 }
 
@@ -83,6 +84,7 @@ pub struct DefaultHttpRequestMaker {
     // subsequent one reuses it. Shared (not per-clone) since this struct is
     // held behind an Arc and cloned freely.
     flaresolverr_session: Arc<Mutex<Option<String>>>,
+    flaresolverr_request_lock: Arc<Mutex<()>>,
 }
 
 impl DefaultHttpRequestMaker {
@@ -91,6 +93,7 @@ impl DefaultHttpRequestMaker {
             client: reqwest::Client::new(),
             flaresolverr_url: std::env::var("FLARESOLVERR_URL").ok(),
             flaresolverr_session: Arc::new(Mutex::new(None)),
+            flaresolverr_request_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -150,6 +153,59 @@ impl DefaultHttpRequestMaker {
         Ok(id)
     }
 
+    async fn destroy_flaresolverr_session(&self, flaresolverr_url: &str, session: &str) {
+        let request = FlareSolverrRequest {
+            cmd: "sessions.destroy",
+            url: None,
+            max_timeout: 60_000,
+            session: Some(session),
+        };
+        if let Err(err) = self
+            .client
+            .post(format!("{flaresolverr_url}/v1"))
+            .json(&request)
+            .send()
+            .await
+        {
+            eprintln!("Failed to destroy FlareSolverr session {session}: {err}");
+        }
+    }
+
+    pub async fn cleanup_stale_sessions(&self) {
+        let Some(flaresolverr_url) = self.flaresolverr_url.as_deref() else {
+            return;
+        };
+        let request = FlareSolverrRequest {
+            cmd: "sessions.list",
+            url: None,
+            max_timeout: 60_000,
+            session: None,
+        };
+        let response = self
+            .client
+            .post(format!("{flaresolverr_url}/v1"))
+            .json(&request)
+            .send()
+            .await
+            .and_then(|r| r.error_for_status());
+        let sessions = match response {
+            Ok(resp) => match resp.json::<FlareSolverrResponse>().await {
+                Ok(body) => body.sessions,
+                Err(err) => {
+                    eprintln!("Failed to parse FlareSolverr sessions.list response: {err}");
+                    return;
+                }
+            },
+            Err(err) => {
+                eprintln!("Failed to list FlareSolverr sessions: {err}");
+                return;
+            }
+        };
+        for session in sessions {
+            self.destroy_flaresolverr_session(flaresolverr_url, &session).await;
+        }
+    }
+
     async fn request_solution(
         &self,
         flaresolverr_url: &str,
@@ -182,15 +238,26 @@ impl DefaultHttpRequestMaker {
         })
     }
 
+    async fn replace_flaresolverr_session(&self, flaresolverr_url: &str, failed_session: &str) -> Result<String, FetchError> {
+        let mut current = self.flaresolverr_session.lock().await;
+        if current.as_deref() != Some(failed_session) {
+            if let Some(id) = current.as_ref() {
+                return Ok(id.clone());
+            }
+        }
+        self.destroy_flaresolverr_session(flaresolverr_url, failed_session).await;
+        let id = self.create_flaresolverr_session(flaresolverr_url).await?;
+        *current = Some(id.clone());
+        Ok(id)
+    }
+
     async fn get_via_flaresolverr(&self, flaresolverr_url: &str, url: &str) -> Result<String, FetchError> {
+        let _guard = self.flaresolverr_request_lock.lock().await;
         let session = self.ensure_flaresolverr_session(flaresolverr_url).await?;
         let solution = match self.request_solution(flaresolverr_url, url, &session).await {
             Ok(solution) => solution,
             Err(_) => {
-                // The cached session may be stale (FlareSolverr restarted,
-                // session expired) - drop it and retry once with a fresh one.
-                *self.flaresolverr_session.lock().await = None;
-                let fresh_session = self.ensure_flaresolverr_session(flaresolverr_url).await?;
+                let fresh_session = self.replace_flaresolverr_session(flaresolverr_url, &session).await?;
                 self.request_solution(flaresolverr_url, url, &fresh_session).await?
             }
         };
@@ -224,49 +291,3 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
     }
 }
 
-#[derive(Clone)]
-pub struct FileBackedHttpRequestMaker<T: HttpRequestMaker + Clone> {
-    inner: T,
-    storage_dir: PathBuf,
-}
-
-impl<T: HttpRequestMaker + Clone> FileBackedHttpRequestMaker<T> {
-    pub fn new(inner: T, storage_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            inner,
-            storage_dir: storage_dir.into(),
-        }
-    }
-
-    fn key_for_url(url: &str) -> String {
-        url.rsplit('/').next().unwrap_or(url).to_lowercase()
-    }
-
-    fn path_for_key(&self, key: &str) -> PathBuf {
-        self.storage_dir.join(format!("{key}.html"))
-    }
-}
-
-impl<T: HttpRequestMaker + Clone> HttpRequestMaker for FileBackedHttpRequestMaker<T> {
-    async fn get(&self, url: &str) -> Result<String, FetchError> {
-        let path = self.path_for_key(&Self::key_for_url(url));
-
-        if let Ok(html) = tokio::fs::read_to_string(&path).await {
-            return Ok(html);
-        }
-
-        let html = self.inner.get(url).await?;
-
-        if let Some(parent) = path.parent() {
-            if let Err(err) = tokio::fs::create_dir_all(parent).await {
-                eprintln!("Failed to create HTML storage dir {parent:?}: {err}");
-                return Ok(html);
-            }
-        }
-        if let Err(err) = tokio::fs::write(&path, &html).await {
-            eprintln!("Failed to save HTML for {url} to {path:?}: {err}");
-        }
-
-        Ok(html)
-    }
-}

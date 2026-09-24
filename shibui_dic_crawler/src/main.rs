@@ -13,6 +13,7 @@ async fn main() {
     println!("Storing fetched HTML under {html_storage_dir}");
 
     let cambridge_fetcher = Fetcher::new(CambridgeDictionaryScraper::new(html_storage_dir));
+    cambridge_fetcher.cleanup_stale_flaresolverr_sessions().await;
     let shared_state = Arc::new(AppState {
         fetcher: cambridge_fetcher,
     });
@@ -47,5 +48,9 @@ impl Fetcher {
 
     pub async fn fetch<T: AsRef<str>>(&self, word: T) -> anyhow::Result<Option<WordDefinition>> {
         self.scraper.fetch(word.as_ref()).await
+    }
+
+    pub async fn cleanup_stale_flaresolverr_sessions(&self) {
+        self.scraper.cleanup_stale_flaresolverr_sessions().await;
     }
 }

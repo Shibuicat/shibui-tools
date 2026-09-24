@@ -1,6 +1,17 @@
 use anyhow::bail;
 use scraper::{selectable::Selectable, ElementRef, Html, Selector};
 
+#[derive(Debug)]
+pub struct WordNotFoundError;
+
+impl std::fmt::Display for WordNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Word doesn't exist")
+    }
+}
+
+impl std::error::Error for WordNotFoundError {}
+
 use crate::scraper::{
     Class, ClassDefinition, Region, WordClass, WordContext, WordDefinition, WordExplanation,
     WordPronounce, WordUsageExample,
@@ -18,7 +29,7 @@ impl<'a> WordPage<'a> {
         
          let word_class_count = init.word_class_sections().len(); 
         if word_class_count == 0 {
-            bail!("Word doesn't exist");
+            bail!(WordNotFoundError);
         }
 
         //commented out this section because i'm not sure if it's still holds true or not
@@ -47,12 +58,18 @@ impl<'a> WordPage<'a> {
         }
 
         let word = word_classes.first().unwrap().get_current_word();
+        let extracted_html = word_classes
+            .iter()
+            .map(|section| section.inner_html_ele.html())
+            .collect::<Vec<_>>()
+            .join("\n");
         let word_definition = WordDefinition {
             word,
             classes: word_classes
                 .iter()
                 .map(|class| class.get_word_class_definition())
                 .collect(),
+            extracted_html: Some(extracted_html),
         };
 
         Ok(word_definition)
@@ -135,8 +152,12 @@ impl<'a> WordClassHeaderSection<'a> {
 
     pub fn get_class(&self) -> Class {
         let selector = Selector::parse(".pos.dpos").unwrap();
-        let class_ele = self.inner_html_ele.select(&selector).next().unwrap();
-        let text = class_ele.text().next().unwrap();
+        let text = self
+            .inner_html_ele
+            .select(&selector)
+            .next()
+            .and_then(|class_ele| class_ele.text().next())
+            .unwrap_or("");
         text.into()
     }
 
@@ -148,7 +169,7 @@ impl<'a> WordClassHeaderSection<'a> {
         if uk_ipa.is_some() {
             result.push(WordPronounce {
                 ipa: uk_ipa.unwrap(),
-                link: self.get_uk_sound_link().unwrap(),
+                link: self.get_uk_sound_link().unwrap_or_default(),
                 region: Region::UK,
             })
         }
