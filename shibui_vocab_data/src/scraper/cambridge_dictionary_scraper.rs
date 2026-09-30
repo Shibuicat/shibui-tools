@@ -7,30 +7,36 @@ use crate::utils::http_request::{DefaultHttpRequestMaker, FetchError, HttpReques
 use crate::utils::html_parser::HtmlParser;
 
 #[derive(Clone)]
-pub struct CambridgeDictionaryScraper {
-    request_maker: DefaultHttpRequestMaker,
+pub struct CambridgeDictionaryScraper<R = DefaultHttpRequestMaker> {
+    request_maker: R,
     html_parser: CambridgeHtmlParser,
     storage_dir: PathBuf,
 }
 
 impl CambridgeDictionaryScraper {
     pub fn new(html_storage_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            request_maker: DefaultHttpRequestMaker::new(),
-            html_parser: CambridgeHtmlParser,
-            storage_dir: html_storage_dir.into(),
-        }
+        Self::with_request_maker(DefaultHttpRequestMaker::new(), html_storage_dir)
     }
 
     pub async fn cleanup_stale_flaresolverr_sessions(&self) {
         self.request_maker.cleanup_stale_sessions().await;
     }
+}
 
-    fn make_request_url(&self, word: &str) -> String {
-        return format!(
-            "{}{}",
-            "https://dictionary.cambridge.org/dictionary/english/", word
-        );
+impl<R: HttpRequestMaker> CambridgeDictionaryScraper<R> {
+    pub fn with_request_maker(request_maker: R, html_storage_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            request_maker,
+            html_parser: CambridgeHtmlParser,
+            storage_dir: html_storage_dir.into(),
+        }
+    }
+
+    fn candidate_urls(&self, word: &str) -> [String; 2] {
+        [
+            format!("https://dictionary.cambridge.org/search/direct/?datasetsearch=english&q={word}"),
+            format!("https://dictionary.cambridge.org/dictionary/english/{word}"),
+        ]
     }
 
     fn cache_path(&self, word: &str) -> PathBuf {
@@ -60,26 +66,36 @@ impl CambridgeDictionaryScraper {
         }
     }
 
+    async fn fetch_from(&self, word: &str, url: &str) -> anyhow::Result<Option<WordDefinition>> {
+        match self.request_maker.get(url).await {
+            Ok(html) => self.parse_result(word, &html),
+            Err(FetchError::NotFound(msg)) => {
+                eprintln!("{word} doesn't exist: {msg}");
+                Ok(None)
+            }
+            Err(FetchError::Other(err)) => {
+                eprintln!("Failed to fetch {word}: {err}");
+                Err(err)
+            }
+        }
+    }
+
+    async fn fetch_live(&self, word: &str) -> anyhow::Result<Option<WordDefinition>> {
+        for url in self.candidate_urls(word) {
+            if let Some(definition) = self.fetch_from(word, &url).await? {
+                return Ok(Some(definition));
+            }
+        }
+        Ok(None)
+    }
+
     pub async fn fetch(&self, word: &str) -> anyhow::Result<Option<WordDefinition>> {
         let cache_path = self.cache_path(word);
         if let Ok(cached_html) = tokio::fs::read_to_string(&cache_path).await {
             return self.parse_result(word, &cached_html);
         }
 
-        let fetch_url = self.make_request_url(word);
-        let html_content = match self.request_maker.get(&fetch_url).await {
-            Ok(html) => html,
-            Err(FetchError::NotFound(msg)) => {
-                eprintln!("{word} doesn't exist: {msg}");
-                return Ok(None);
-            }
-            Err(FetchError::Other(err)) => {
-                eprintln!("Failed to fetch {word}: {err}");
-                return Err(err);
-            }
-        };
-
-        let result = match self.parse_result(word, &html_content)? {
+        let result = match self.fetch_live(word).await? {
             Some(result) => result,
             None => return Ok(None),
         };

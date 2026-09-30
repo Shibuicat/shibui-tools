@@ -27,8 +27,7 @@ impl<'a> WordPage<'a> {
         //document.querySelector(".ddef_h .def.ddef_d.db .usage.dusage")
         let init = Self { content: html };
         
-         let word_class_count = init.word_class_sections().len(); 
-        if word_class_count == 0 {
+        if init.word_class_sections().is_empty() && init.phrase_sections().is_empty() {
             bail!(WordNotFoundError);
         }
 
@@ -44,17 +43,55 @@ impl<'a> WordPage<'a> {
     }
 
     fn word_class_sections(&'a self) -> Vec<WordClassSection<'a>> {
-        let selector = Selector::parse(".pr.entry-body__el").unwrap();
+        let primary = self.sections_matching(".pr.entry-body__el");
+        if primary.is_empty() {
+            self.sections_matching(".entry-body__el")
+        } else {
+            primary
+        }
+    }
+
+    fn sections_matching(&'a self, css: &str) -> Vec<WordClassSection<'a>> {
+        let selector = Selector::parse(css).unwrap();
         self.content
             .select(&selector)
             .map(|ele| WordClassSection::new(ele, &self))
             .collect()
     }
 
+    fn phrase_sections(&self) -> Vec<PhraseSection<'a>> {
+        let selector = Selector::parse(".pr.idiom-block").unwrap();
+        let content: &'a Html = self.content;
+        content
+            .select(&selector)
+            .map(PhraseSection::new)
+            .filter(PhraseSection::has_definition)
+            .collect()
+    }
+
+    fn get_phrase_definition(&self) -> anyhow::Result<WordDefinition> {
+        let phrases = self.phrase_sections();
+        let word = match phrases.first() {
+            Some(phrase) => phrase.get_word(),
+            None => bail!(WordNotFoundError),
+        };
+        let extracted_html = phrases
+            .iter()
+            .map(|phrase| phrase.inner_html_ele.html())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Ok(WordDefinition {
+            word,
+            classes: phrases.iter().map(PhraseSection::get_word_class).collect(),
+            extracted_html: Some(extracted_html),
+        })
+    }
+
     pub fn get_word_definition(&self) -> anyhow::Result<WordDefinition> {
         let word_classes = self.word_class_sections();
         if word_classes.len() == 0 {
-            bail!("Word not found");
+            return self.get_phrase_definition();
         }
 
         let word = word_classes.first().unwrap().get_current_word();
@@ -111,10 +148,17 @@ impl<'a> WordClassSection<'a> {
 
     pub fn definitions(&'a self) -> Vec<ClassDefinitionSection<'a>> {
         let selector = Selector::parse(".pos-body").unwrap();
-        self.inner_html_ele
+        let bodies: Vec<_> = self
+            .inner_html_ele
             .select(&selector)
             .map(|x| ClassDefinitionSection::new(x, &self))
-            .collect()
+            .collect();
+
+        if bodies.is_empty() {
+            vec![ClassDefinitionSection::new(self.inner_html_ele, &self)]
+        } else {
+            bodies
+        }
     }
 
     pub fn header(&'a self) -> WordClassHeaderSection<'a> {
@@ -312,22 +356,18 @@ impl<'a> ContextBlock<'a> {
         let selector = Selector::parse(".def-block.ddef_block").unwrap();
         self.inner_html_ele
             .select(&selector)
-            .map(|x| WordMeaningBlock::new(x, &self))
+            .map(WordMeaningBlock::new)
             .collect()
     }
 }
 
 struct WordMeaningBlock<'a> {
     inner_html_ele: ElementRef<'a>,
-    context: &'a ContextBlock<'a>,
 }
 
 impl<'a> WordMeaningBlock<'a> {
-    pub fn new(inner_html_ele: ElementRef<'a>, context: &'a ContextBlock<'a>) -> Self {
-        Self {
-            inner_html_ele,
-            context,
-        }
+    pub fn new(inner_html_ele: ElementRef<'a>) -> Self {
+        Self { inner_html_ele }
     }
 
     fn get_explanation(&self) -> String {
@@ -361,6 +401,61 @@ impl<'a> WordMeaningBlock<'a> {
         WordExplanation {
             explanation: self.get_explanation(),
             examples: self.get_examples(),
+        }
+    }
+}
+
+pub struct PhraseSection<'a> {
+    pub inner_html_ele: ElementRef<'a>,
+}
+
+impl<'a> PhraseSection<'a> {
+    pub fn new(inner_html_ele: ElementRef<'a>) -> Self {
+        Self { inner_html_ele }
+    }
+
+    pub fn has_definition(&self) -> bool {
+        let selector = Selector::parse(".def.ddef_d.db").unwrap();
+        self.inner_html_ele.select(&selector).next().is_some()
+    }
+
+    pub fn get_word(&self) -> String {
+        let selector = Selector::parse(".di-title").unwrap();
+        self.inner_html_ele
+            .select(&selector)
+            .next()
+            .map(|title| title.text().collect::<String>().trim().to_owned())
+            .unwrap_or_default()
+    }
+
+    fn get_class(&self) -> Class {
+        let selector = Selector::parse(".pos.dpos").unwrap();
+        self.inner_html_ele
+            .select(&selector)
+            .next()
+            .and_then(|class_ele| class_ele.text().next())
+            .unwrap_or("phrase")
+            .into()
+    }
+
+    pub fn get_word_class(&self) -> WordClass {
+        let selector = Selector::parse(".def-block.ddef_block").unwrap();
+        let meanings = self
+            .inner_html_ele
+            .select(&selector)
+            .map(WordMeaningBlock::new)
+            .map(|block| block.get_meaning())
+            .collect();
+
+        WordClass {
+            class_name: self.get_class(),
+            pronounces: vec![],
+            definitions: vec![ClassDefinition {
+                contexts: vec![WordContext {
+                    description: None,
+                    meanings,
+                }],
+            }],
         }
     }
 }

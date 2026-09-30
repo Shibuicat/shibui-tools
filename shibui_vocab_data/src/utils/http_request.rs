@@ -1,7 +1,8 @@
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+
+use super::session_pool::{session_count_from, SessionPool};
 
 
 #[derive(Debug)]
@@ -83,8 +84,7 @@ pub struct DefaultHttpRequestMaker {
     // after startup pays the ~15-20s challenge-solving cost - every
     // subsequent one reuses it. Shared (not per-clone) since this struct is
     // held behind an Arc and cloned freely.
-    flaresolverr_session: Arc<Mutex<Option<String>>>,
-    flaresolverr_request_lock: Arc<Mutex<()>>,
+    flaresolverr_sessions: Arc<SessionPool>,
 }
 
 impl DefaultHttpRequestMaker {
@@ -92,8 +92,9 @@ impl DefaultHttpRequestMaker {
         Self {
             client: reqwest::Client::new(),
             flaresolverr_url: std::env::var("FLARESOLVERR_URL").ok(),
-            flaresolverr_session: Arc::new(Mutex::new(None)),
-            flaresolverr_request_lock: Arc::new(Mutex::new(())),
+            flaresolverr_sessions: Arc::new(SessionPool::new(session_count_from(
+                std::env::var("FLARESOLVERR_SESSIONS").ok().as_deref(),
+            ))),
         }
     }
 
@@ -141,16 +142,6 @@ impl DefaultHttpRequestMaker {
                 "FlareSolverr sessions.create returned no session id"
             ))
         })
-    }
-
-    async fn ensure_flaresolverr_session(&self, flaresolverr_url: &str) -> Result<String, FetchError> {
-        let mut current = self.flaresolverr_session.lock().await;
-        if let Some(id) = current.as_ref() {
-            return Ok(id.clone());
-        }
-        let id = self.create_flaresolverr_session(flaresolverr_url).await?;
-        *current = Some(id.clone());
-        Ok(id)
     }
 
     async fn destroy_flaresolverr_session(&self, flaresolverr_url: &str, session: &str) {
@@ -238,26 +229,23 @@ impl DefaultHttpRequestMaker {
         })
     }
 
-    async fn replace_flaresolverr_session(&self, flaresolverr_url: &str, failed_session: &str) -> Result<String, FetchError> {
-        let mut current = self.flaresolverr_session.lock().await;
-        if current.as_deref() != Some(failed_session) {
-            if let Some(id) = current.as_ref() {
-                return Ok(id.clone());
-            }
-        }
-        self.destroy_flaresolverr_session(flaresolverr_url, failed_session).await;
-        let id = self.create_flaresolverr_session(flaresolverr_url).await?;
-        *current = Some(id.clone());
-        Ok(id)
-    }
-
     async fn get_via_flaresolverr(&self, flaresolverr_url: &str, url: &str) -> Result<String, FetchError> {
-        let _guard = self.flaresolverr_request_lock.lock().await;
-        let session = self.ensure_flaresolverr_session(flaresolverr_url).await?;
+        let mut pooled = self.flaresolverr_sessions.acquire().await;
+        let session = match pooled.session.clone() {
+            Some(id) => id,
+            None => {
+                let id = self.create_flaresolverr_session(flaresolverr_url).await?;
+                pooled.session = Some(id.clone());
+                id
+            }
+        };
         let solution = match self.request_solution(flaresolverr_url, url, &session).await {
             Ok(solution) => solution,
             Err(_) => {
-                let fresh_session = self.replace_flaresolverr_session(flaresolverr_url, &session).await?;
+                pooled.session = None;
+                self.destroy_flaresolverr_session(flaresolverr_url, &session).await;
+                let fresh_session = self.create_flaresolverr_session(flaresolverr_url).await?;
+                pooled.session = Some(fresh_session.clone());
                 self.request_solution(flaresolverr_url, url, &fresh_session).await?
             }
         };

@@ -1,6 +1,10 @@
+use anyhow::bail;
 use scraper::Html;
 
-use crate::{scraper::WordDefinition, utils::html_parser::cambridge_elements::WordPage};
+use crate::{
+    scraper::WordDefinition,
+    utils::html_parser::{cambridge_elements::WordPage, WordNotFoundError},
+};
 
 use super::HtmlParser;
 
@@ -13,6 +17,9 @@ impl HtmlParser for CambridgeHtmlParser {
         let html_doc = Html::parse_document(html_content);
         let word_page = WordPage::new(&html_doc);
         let word = word_page?.get_word_definition()?;
+        if !word.has_meanings() {
+            bail!(WordNotFoundError);
+        }
         Ok(word)
     }
 }

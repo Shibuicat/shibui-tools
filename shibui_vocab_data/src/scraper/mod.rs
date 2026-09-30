@@ -19,6 +19,16 @@ pub struct WordDefinition {
     pub extracted_html: Option<String>,
 }
 
+impl WordDefinition {
+    pub fn has_meanings(&self) -> bool {
+        self.classes
+            .iter()
+            .flat_map(|class| class.definitions.iter())
+            .flat_map(|definition| definition.contexts.iter())
+            .any(|context| !context.meanings.is_empty())
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct WordPronounce {
     pub region: Region,
