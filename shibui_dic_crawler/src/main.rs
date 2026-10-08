@@ -1,6 +1,8 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use axum::{routing::get, Router};
+use shibui_vocab_data::lookup_queue::{LookupBackend, LookupSettings, QueuedWordLookup, WordLookup};
 use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, WordDefinition};
 mod routes;
 
@@ -12,10 +14,11 @@ async fn main() {
         std::env::var("HTML_STORAGE_DIR").unwrap_or_else(|_| "./html_storage".to_string());
     println!("Storing fetched HTML under {html_storage_dir}");
 
-    let cambridge_fetcher = Fetcher::new(CambridgeDictionaryScraper::new(html_storage_dir));
-    cambridge_fetcher.cleanup_stale_flaresolverr_sessions().await;
+    let fetcher = Arc::new(Fetcher::new(CambridgeDictionaryScraper::new(html_storage_dir)));
+    fetcher.start_session().await;
+    let lookup = QueuedWordLookup::start(fetcher, LookupSettings::from_env());
     let shared_state = Arc::new(AppState {
-        fetcher: cambridge_fetcher,
+        lookup: Box::new(lookup),
     });
 
     let app = Router::new().route(
@@ -31,12 +34,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Clone)]
-struct AppState {
-    fetcher: Fetcher,
+pub struct AppState {
+    lookup: Box<dyn WordLookup>,
 }
 
-#[derive(Clone)]
 pub struct Fetcher {
     scraper: CambridgeDictionaryScraper,
 }
@@ -46,11 +47,17 @@ impl Fetcher {
         Self { scraper }
     }
 
-    pub async fn fetch<T: AsRef<str>>(&self, word: T) -> anyhow::Result<Option<WordDefinition>> {
-        self.scraper.fetch(word.as_ref()).await
+    pub async fn start_session(&self) {
+        self.scraper.start_flaresolverr_session().await;
+    }
+}
+
+impl LookupBackend for Fetcher {
+    fn fetch(&self, word: &str) -> impl Future<Output = anyhow::Result<Option<WordDefinition>>> + Send {
+        self.scraper.fetch(word)
     }
 
-    pub async fn cleanup_stale_flaresolverr_sessions(&self) {
-        self.scraper.cleanup_stale_flaresolverr_sessions().await;
+    fn rotate_session(&self) -> impl Future<Output = ()> + Send {
+        self.scraper.recycle_flaresolverr_session()
     }
 }

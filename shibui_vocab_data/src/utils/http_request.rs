@@ -2,8 +2,14 @@ use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 
-use super::session_pool::{session_count_from, SessionPool};
+use tokio::sync::Mutex;
 
+use super::flaresolverr::FlareSolverrClient;
+use super::session_keeper::SessionKeeper;
+
+const WARM_UP_URL: &str = "https://dictionary.cambridge.org/";
+
+type SharedKeeper = Arc<Mutex<SessionKeeper<FlareSolverrClient>>>;
 
 #[derive(Debug)]
 pub enum FetchError {
@@ -38,63 +44,35 @@ pub trait HttpRequestMaker {
     fn get(&self, url: &str) -> impl Future<Output = Result<String, FetchError>>;
 }
 
-#[derive(serde::Serialize)]
-struct FlareSolverrRequest<'a> {
-    cmd: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<&'a str>,
-    #[serde(rename = "maxTimeout")]
-    max_timeout: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    session: Option<&'a str>,
-}
-
-#[derive(serde::Deserialize)]
-struct FlareSolverrResponse {
-    status: String,
-    message: String,
-    #[serde(default)]
-    session: Option<String>,
-    #[serde(default)]
-    sessions: Vec<String>,
-    #[serde(default)]
-    solution: Option<FlareSolverrSolution>,
-}
-
-#[derive(serde::Deserialize)]
-struct FlareSolverrSolution {
-    url: String,
-    status: u16,
-    response: String,
-}
-
 #[derive(Clone)]
 pub struct DefaultHttpRequestMaker {
     client: reqwest::Client,
-    // Set from the FLARESOLVERR_URL env var (e.g. http://localhost:8191). When
-    // present, every GET routes through FlareSolverr's real-Chromium-backed
-    // /v1 API instead of a direct reqwest call - a bare cf_clearance cookie
-    // isn't enough on its own, since Cloudflare also binds it to the TLS
-    // fingerprint of whatever client solved the challenge, which neither curl
-    // nor reqwest can reproduce. Absent (e.g. the deployment binary, which has
-    // no .env) falls back to the direct path unchanged.
-    flaresolverr_url: Option<String>,
-    // A FlareSolverr session keeps one browser context (and its solved
-    // cf_clearance cookie) alive across requests, so only the first fetch
-    // after startup pays the ~15-20s challenge-solving cost - every
-    // subsequent one reuses it. Shared (not per-clone) since this struct is
-    // held behind an Arc and cloned freely.
-    flaresolverr_sessions: Arc<SessionPool>,
+    flaresolverr: Option<SharedKeeper>,
 }
 
 impl DefaultHttpRequestMaker {
     pub fn new() -> Self {
+        let flaresolverr = std::env::var("FLARESOLVERR_URL").ok().map(|url| {
+            Arc::new(Mutex::new(SessionKeeper::new(
+                FlareSolverrClient::new(&url),
+                WARM_UP_URL,
+            )))
+        });
         Self {
             client: reqwest::Client::new(),
-            flaresolverr_url: std::env::var("FLARESOLVERR_URL").ok(),
-            flaresolverr_sessions: Arc::new(SessionPool::new(session_count_from(
-                std::env::var("FLARESOLVERR_SESSIONS").ok().as_deref(),
-            ))),
+            flaresolverr,
+        }
+    }
+
+    pub async fn start_session(&self) {
+        if let Some(keeper) = &self.flaresolverr {
+            keeper.lock().await.start().await;
+        }
+    }
+
+    pub async fn recycle_session(&self) {
+        if let Some(keeper) = &self.flaresolverr {
+            keeper.lock().await.recycle().await;
         }
     }
 
@@ -115,146 +93,12 @@ impl DefaultHttpRequestMaker {
         Ok(())
     }
 
-    async fn create_flaresolverr_session(&self, flaresolverr_url: &str) -> Result<String, FetchError> {
-        let request = FlareSolverrRequest {
-            cmd: "sessions.create",
-            url: None,
-            max_timeout: 60_000,
-            session: None,
-        };
-        let response: FlareSolverrResponse = self
-            .client
-            .post(format!("{flaresolverr_url}/v1"))
-            .json(&request)
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        if response.status != "ok" {
-            return Err(FetchError::Other(anyhow::anyhow!(
-                "FlareSolverr session create failed: {}",
-                response.message
-            )));
-        }
-        response.session.ok_or_else(|| {
-            FetchError::Other(anyhow::anyhow!(
-                "FlareSolverr sessions.create returned no session id"
-            ))
-        })
-    }
-
-    async fn destroy_flaresolverr_session(&self, flaresolverr_url: &str, session: &str) {
-        let request = FlareSolverrRequest {
-            cmd: "sessions.destroy",
-            url: None,
-            max_timeout: 60_000,
-            session: Some(session),
-        };
-        if let Err(err) = self
-            .client
-            .post(format!("{flaresolverr_url}/v1"))
-            .json(&request)
-            .send()
-            .await
-        {
-            eprintln!("Failed to destroy FlareSolverr session {session}: {err}");
-        }
-    }
-
-    pub async fn cleanup_stale_sessions(&self) {
-        let Some(flaresolverr_url) = self.flaresolverr_url.as_deref() else {
-            return;
-        };
-        let request = FlareSolverrRequest {
-            cmd: "sessions.list",
-            url: None,
-            max_timeout: 60_000,
-            session: None,
-        };
-        let response = self
-            .client
-            .post(format!("{flaresolverr_url}/v1"))
-            .json(&request)
-            .send()
-            .await
-            .and_then(|r| r.error_for_status());
-        let sessions = match response {
-            Ok(resp) => match resp.json::<FlareSolverrResponse>().await {
-                Ok(body) => body.sessions,
-                Err(err) => {
-                    eprintln!("Failed to parse FlareSolverr sessions.list response: {err}");
-                    return;
-                }
-            },
-            Err(err) => {
-                eprintln!("Failed to list FlareSolverr sessions: {err}");
-                return;
-            }
-        };
-        for session in sessions {
-            self.destroy_flaresolverr_session(flaresolverr_url, &session).await;
-        }
-    }
-
-    async fn request_solution(
-        &self,
-        flaresolverr_url: &str,
-        url: &str,
-        session: &str,
-    ) -> Result<FlareSolverrSolution, FetchError> {
-        let request = FlareSolverrRequest {
-            cmd: "request.get",
-            url: Some(url),
-            max_timeout: 60_000,
-            session: Some(session),
-        };
-        let response: FlareSolverrResponse = self
-            .client
-            .post(format!("{flaresolverr_url}/v1"))
-            .json(&request)
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        if response.status != "ok" {
-            return Err(FetchError::Other(anyhow::anyhow!(
-                "FlareSolverr failed for {url}: {}",
-                response.message
-            )));
-        }
-        response.solution.ok_or_else(|| {
-            FetchError::Other(anyhow::anyhow!("FlareSolverr returned no solution for {url}"))
-        })
-    }
-
-    async fn get_via_flaresolverr(&self, flaresolverr_url: &str, url: &str) -> Result<String, FetchError> {
-        let mut pooled = self.flaresolverr_sessions.acquire().await;
-        let session = match pooled.session.clone() {
-            Some(id) => id,
-            None => {
-                let id = self.create_flaresolverr_session(flaresolverr_url).await?;
-                pooled.session = Some(id.clone());
-                id
-            }
-        };
-        let solution = match self.request_solution(flaresolverr_url, url, &session).await {
-            Ok(solution) => solution,
-            Err(_) => {
-                pooled.session = None;
-                self.destroy_flaresolverr_session(flaresolverr_url, &session).await;
-                let fresh_session = self.create_flaresolverr_session(flaresolverr_url).await?;
-                pooled.session = Some(fresh_session.clone());
-                self.request_solution(flaresolverr_url, url, &fresh_session).await?
-            }
-        };
-
+    async fn get_via_flaresolverr(&self, keeper: &SharedKeeper, url: &str) -> Result<String, FetchError> {
+        let solution = keeper.lock().await.get(url).await?;
         println!(
             "GET {url} (via FlareSolverr) -> status {} final_url {}",
             solution.status, solution.url
         );
-
         Self::check_not_found_or_challenge(url, &solution.url, &solution.response)?;
         Ok(solution.response)
     }
@@ -262,8 +106,8 @@ impl DefaultHttpRequestMaker {
 
 impl HttpRequestMaker for DefaultHttpRequestMaker {
     async fn get(&self, url: &str) -> Result<String, FetchError> {
-        if let Some(flaresolverr_url) = &self.flaresolverr_url {
-            return self.get_via_flaresolverr(flaresolverr_url, url).await;
+        if let Some(keeper) = &self.flaresolverr {
+            return self.get_via_flaresolverr(keeper, url).await;
         }
 
         let response = self.client.get(url).send().await?;
@@ -278,4 +122,3 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
         Ok(result)
     }
 }
-

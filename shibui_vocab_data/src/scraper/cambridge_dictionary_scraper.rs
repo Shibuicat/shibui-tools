@@ -18,8 +18,12 @@ impl CambridgeDictionaryScraper {
         Self::with_request_maker(DefaultHttpRequestMaker::new(), html_storage_dir)
     }
 
-    pub async fn cleanup_stale_flaresolverr_sessions(&self) {
-        self.request_maker.cleanup_stale_sessions().await;
+    pub async fn start_flaresolverr_session(&self) {
+        self.request_maker.start_session().await;
+    }
+
+    pub async fn recycle_flaresolverr_session(&self) {
+        self.request_maker.recycle_session().await;
     }
 }
 
