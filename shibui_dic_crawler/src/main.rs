@@ -60,4 +60,8 @@ impl LookupBackend for Fetcher {
     fn rotate_session(&self) -> impl Future<Output = ()> + Send {
         self.scraper.recycle_flaresolverr_session()
     }
+
+    fn release_session(&self) -> impl Future<Output = ()> + Send {
+        self.scraper.release_flaresolverr_session()
+    }
 }

@@ -12,6 +12,7 @@ use crate::scraper::WordDefinition;
 pub const DEFAULT_QUEUE_CAPACITY: usize = 20;
 pub const DEFAULT_LOOKUP_TIMEOUT_SECS: u64 = 90;
 pub const DEFAULT_SESSION_MAX_AGE_SECS: u64 = 86_400;
+pub const DEFAULT_SESSION_IDLE_SECS: u64 = 600;
 
 #[derive(Debug)]
 pub enum LookupError {
@@ -44,6 +45,7 @@ pub trait WordLookup: Send + Sync {
 pub trait LookupBackend: Send + Sync + 'static {
     fn fetch(&self, word: &str) -> impl Future<Output = anyhow::Result<Option<WordDefinition>>> + Send;
     fn rotate_session(&self) -> impl Future<Output = ()> + Send;
+    fn release_session(&self) -> impl Future<Output = ()> + Send;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +53,7 @@ pub struct LookupSettings {
     pub capacity: usize,
     pub timeout: Duration,
     pub session_max_age: Duration,
+    pub session_idle_timeout: Duration,
 }
 
 impl LookupSettings {
@@ -59,14 +62,21 @@ impl LookupSettings {
             std::env::var("LOOKUP_QUEUE_CAPACITY").ok().as_deref(),
             std::env::var("LOOKUP_TIMEOUT_SECS").ok().as_deref(),
             std::env::var("FLARESOLVERR_SESSION_MAX_AGE_SECS").ok().as_deref(),
+            std::env::var("FLARESOLVERR_SESSION_IDLE_SECS").ok().as_deref(),
         )
     }
 
-    pub fn from_values(capacity: Option<&str>, timeout_secs: Option<&str>, max_age_secs: Option<&str>) -> Self {
+    pub fn from_values(
+        capacity: Option<&str>,
+        timeout_secs: Option<&str>,
+        max_age_secs: Option<&str>,
+        idle_secs: Option<&str>,
+    ) -> Self {
         Self {
             capacity: positive_or(capacity, DEFAULT_QUEUE_CAPACITY as u64) as usize,
             timeout: Duration::from_secs(positive_or(timeout_secs, DEFAULT_LOOKUP_TIMEOUT_SECS)),
             session_max_age: Duration::from_secs(positive_or(max_age_secs, DEFAULT_SESSION_MAX_AGE_SECS)),
+            session_idle_timeout: Duration::from_secs(positive_or(idle_secs, DEFAULT_SESSION_IDLE_SECS)),
         }
     }
 }
@@ -91,7 +101,7 @@ pub struct QueuedWordLookup {
 impl QueuedWordLookup {
     pub fn start<B: LookupBackend>(backend: Arc<B>, settings: LookupSettings) -> Self {
         let (jobs, inbox) = mpsc::channel(settings.capacity);
-        tokio::spawn(run_worker(backend, inbox, settings.session_max_age));
+        tokio::spawn(run_worker(backend, inbox, settings));
         Self {
             jobs,
             timeout: settings.timeout,
@@ -125,17 +135,25 @@ impl WordLookup for QueuedWordLookup {
     }
 }
 
-async fn run_worker<B: LookupBackend>(backend: Arc<B>, mut inbox: mpsc::Receiver<Job>, session_max_age: Duration) {
-    let mut next_rotation = Instant::now() + session_max_age;
+async fn run_worker<B: LookupBackend>(backend: Arc<B>, mut inbox: mpsc::Receiver<Job>, settings: LookupSettings) {
+    let mut next_rotation = Instant::now() + settings.session_max_age;
+    let mut release_at = Some(Instant::now() + settings.session_idle_timeout);
     loop {
         tokio::select! {
             job = inbox.recv() => match job {
-                Some(job) => serve(backend.as_ref(), job).await,
+                Some(job) => {
+                    serve(backend.as_ref(), job).await;
+                    release_at = Some(Instant::now() + settings.session_idle_timeout);
+                }
                 None => break,
             },
             _ = sleep_until(next_rotation) => {
                 backend.rotate_session().await;
-                next_rotation = Instant::now() + session_max_age;
+                next_rotation = Instant::now() + settings.session_max_age;
+            }
+            _ = sleep_until(release_at.unwrap_or(next_rotation)), if release_at.is_some() => {
+                backend.release_session().await;
+                release_at = None;
             }
         }
     }

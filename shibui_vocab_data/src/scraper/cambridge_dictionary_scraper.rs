@@ -25,6 +25,10 @@ impl CambridgeDictionaryScraper {
     pub async fn recycle_flaresolverr_session(&self) {
         self.request_maker.recycle_session().await;
     }
+
+    pub async fn release_flaresolverr_session(&self) {
+        self.request_maker.release_session().await;
+    }
 }
 
 impl<R: HttpRequestMaker> CambridgeDictionaryScraper<R> {

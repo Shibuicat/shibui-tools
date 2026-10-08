@@ -76,6 +76,12 @@ impl DefaultHttpRequestMaker {
         }
     }
 
+    pub async fn release_session(&self) {
+        if let Some(keeper) = &self.flaresolverr {
+            keeper.lock().await.release().await;
+        }
+    }
+
     fn check_not_found_or_challenge(url: &str, final_url: &str, html: &str) -> Result<(), FetchError> {
         let final_path = reqwest::Url::parse(final_url)
             .map(|u| u.path().to_string())

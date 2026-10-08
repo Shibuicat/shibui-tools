@@ -25,8 +25,14 @@ impl<B: SessionBackend> SessionKeeper<B> {
     pub async fn recycle(&mut self) {
         if let Some(old) = self.session.take() {
             self.backend.destroy_session(&old).await;
+            self.open_warm_session().await;
         }
-        self.open_warm_session().await;
+    }
+
+    pub async fn release(&mut self) {
+        if let Some(old) = self.session.take() {
+            self.backend.destroy_session(&old).await;
+        }
     }
 
     pub async fn get(&mut self, url: &str) -> Result<Solution, FetchError> {

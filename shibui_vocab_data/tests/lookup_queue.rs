@@ -4,7 +4,8 @@ use std::time::Duration;
 
 use shibui_vocab_data::lookup_queue::{
     positive_or, LookupBackend, LookupError, LookupSettings, QueuedWordLookup, WordLookup,
-    DEFAULT_LOOKUP_TIMEOUT_SECS, DEFAULT_QUEUE_CAPACITY, DEFAULT_SESSION_MAX_AGE_SECS,
+    DEFAULT_LOOKUP_TIMEOUT_SECS, DEFAULT_QUEUE_CAPACITY, DEFAULT_SESSION_IDLE_SECS,
+    DEFAULT_SESSION_MAX_AGE_SECS,
 };
 use shibui_vocab_data::scraper::WordDefinition;
 use tokio::sync::Semaphore;
@@ -24,6 +25,7 @@ struct FakeBackend {
     in_flight: AtomicUsize,
     max_in_flight: AtomicUsize,
     rotations: AtomicUsize,
+    releases: AtomicUsize,
 }
 
 impl FakeBackend {
@@ -47,6 +49,7 @@ impl FakeBackend {
             in_flight: AtomicUsize::new(0),
             max_in_flight: AtomicUsize::new(0),
             rotations: AtomicUsize::new(0),
+            releases: AtomicUsize::new(0),
         })
     }
 
@@ -73,13 +76,24 @@ impl LookupBackend for FakeBackend {
     async fn rotate_session(&self) {
         self.rotations.fetch_add(1, Ordering::SeqCst);
     }
+
+    async fn release_session(&self) {
+        self.releases.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
+const NEVER_IDLE_SECS: u64 = 10_000_000;
+
 fn settings(capacity: usize, timeout_secs: u64, max_age_secs: u64) -> LookupSettings {
+    settings_with_idle(capacity, timeout_secs, max_age_secs, NEVER_IDLE_SECS)
+}
+
+fn settings_with_idle(capacity: usize, timeout_secs: u64, max_age_secs: u64, idle_secs: u64) -> LookupSettings {
     LookupSettings {
         capacity,
         timeout: Duration::from_secs(timeout_secs),
         session_max_age: Duration::from_secs(max_age_secs),
+        session_idle_timeout: Duration::from_secs(idle_secs),
     }
 }
 
@@ -91,18 +105,19 @@ async fn let_tasks_run() {
 
 #[test]
 fn settings_default_when_unset() {
-    let defaults = LookupSettings::from_values(None, None, None);
+    let defaults = LookupSettings::from_values(None, None, None, None);
 
     assert_eq!(defaults.capacity, DEFAULT_QUEUE_CAPACITY);
     assert_eq!(defaults.timeout, Duration::from_secs(DEFAULT_LOOKUP_TIMEOUT_SECS));
     assert_eq!(defaults.session_max_age, Duration::from_secs(DEFAULT_SESSION_MAX_AGE_SECS));
+    assert_eq!(defaults.session_idle_timeout, Duration::from_secs(DEFAULT_SESSION_IDLE_SECS));
 }
 
 #[test]
 fn settings_read_valid_values() {
-    let parsed = LookupSettings::from_values(Some("5"), Some(" 30 "), Some("3600"));
+    let parsed = LookupSettings::from_values(Some("5"), Some(" 30 "), Some("3600"), Some("120"));
 
-    assert_eq!(parsed, settings(5, 30, 3600));
+    assert_eq!(parsed, settings_with_idle(5, 30, 3600, 120));
 }
 
 #[test]
@@ -259,4 +274,66 @@ async fn keeps_serving_after_a_rotation() {
 
     assert_eq!(result.unwrap().word, "after");
     assert_eq!(backend.rotations.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn releases_the_session_once_after_it_has_been_idle() {
+    let backend = FakeBackend::open();
+    let _lookup = QueuedWordLookup::start(backend.clone(), settings_with_idle(5, 90, 10_000_000, 10));
+    let_tasks_run().await;
+
+    tokio::time::advance(Duration::from_secs(11)).await;
+    let_tasks_run().await;
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 1);
+
+    tokio::time::advance(Duration::from_secs(60)).await;
+    let_tasks_run().await;
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_lookup_restarts_the_idle_timer() {
+    let backend = FakeBackend::open();
+    let lookup = QueuedWordLookup::start(backend.clone(), settings_with_idle(5, 90, 10_000_000, 10));
+    let_tasks_run().await;
+    tokio::time::advance(Duration::from_secs(8)).await;
+    let_tasks_run().await;
+
+    lookup.lookup("busy").await.unwrap();
+    tokio::time::advance(Duration::from_secs(8)).await;
+    let_tasks_run().await;
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 0);
+
+    tokio::time::advance(Duration::from_secs(3)).await;
+    let_tasks_run().await;
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn serves_a_lookup_after_the_session_was_released() {
+    let backend = FakeBackend::open();
+    let lookup = QueuedWordLookup::start(backend.clone(), settings_with_idle(5, 90, 10_000_000, 10));
+    let_tasks_run().await;
+    tokio::time::advance(Duration::from_secs(11)).await;
+    let_tasks_run().await;
+
+    let result = lookup.lookup("later").await.unwrap();
+
+    assert_eq!(result.unwrap().word, "later");
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn releases_again_after_a_new_lookup_and_another_idle_period() {
+    let backend = FakeBackend::open();
+    let lookup = QueuedWordLookup::start(backend.clone(), settings_with_idle(5, 90, 10_000_000, 10));
+    let_tasks_run().await;
+    tokio::time::advance(Duration::from_secs(11)).await;
+    let_tasks_run().await;
+    lookup.lookup("again").await.unwrap();
+
+    tokio::time::advance(Duration::from_secs(11)).await;
+    let_tasks_run().await;
+
+    assert_eq!(backend.releases.load(Ordering::SeqCst), 2);
 }

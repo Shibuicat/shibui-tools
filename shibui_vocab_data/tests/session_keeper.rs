@@ -164,3 +164,42 @@ async fn a_failed_create_at_start_is_retried_on_the_first_request() {
 
     assert!(backend.calls().contains(&"get s1 https://a/".to_string()));
 }
+
+#[tokio::test]
+async fn release_destroys_the_session_and_the_next_request_opens_a_new_one() {
+    let backend = FakeBackend::default();
+    let mut keeper = keeper(&backend);
+    keeper.start().await;
+
+    keeper.release().await;
+    keeper.get("https://a/").await.unwrap();
+
+    let calls = backend.calls();
+    assert_eq!(
+        calls[calls.len() - 3..],
+        ["destroy s1", "create s2", "get s2 https://a/"]
+    );
+}
+
+#[tokio::test]
+async fn release_without_a_session_does_nothing() {
+    let backend = FakeBackend::default();
+    let mut keeper = keeper(&backend);
+
+    keeper.release().await;
+
+    assert!(backend.calls().is_empty());
+}
+
+#[tokio::test]
+async fn recycle_does_not_open_a_session_when_none_is_open() {
+    let backend = FakeBackend::default();
+    let mut keeper = keeper(&backend);
+    keeper.start().await;
+    keeper.release().await;
+    let before = backend.calls().len();
+
+    keeper.recycle().await;
+
+    assert_eq!(backend.calls().len(), before);
+}
