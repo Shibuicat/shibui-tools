@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
 
 use axum::{routing::get, Router};
 use shibui_vocab_data::lookup_queue::{LookupBackend, LookupSettings, QueuedWordLookup, WordLookup};
-use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, WordDefinition};
+use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, WiktionaryScraper, WordDefinition};
 mod routes;
 
 #[tokio::main]
@@ -16,10 +17,18 @@ async fn main() {
 
     let fetcher = Arc::new(Fetcher::new(CambridgeDictionaryScraper::new(html_storage_dir)));
     fetcher.start_session().await;
-    let lookup = QueuedWordLookup::start(fetcher, LookupSettings::from_env());
-    let shared_state = Arc::new(AppState {
-        lookup: Box::new(lookup),
-    });
+
+    let wiktionary_storage_dir = std::env::var("WIKTIONARY_HTML_STORAGE_DIR")
+        .unwrap_or_else(|_| "./html_storage_wiktionary".to_string());
+    println!("Storing fetched Wiktionary HTML under {wiktionary_storage_dir}");
+    let wiktionary = Arc::new(WiktionaryFetcher::new(WiktionaryScraper::new(wiktionary_storage_dir)));
+
+    let settings = LookupSettings::from_env();
+    let lookups: HashMap<String, Box<dyn WordLookup>> = HashMap::from([
+        (routes::cambridge_dic::DEFAULT_SOURCE.to_owned(), Box::new(QueuedWordLookup::start(fetcher, settings)) as Box<dyn WordLookup>),
+        ("wiktionary".to_owned(), Box::new(QueuedWordLookup::start(wiktionary, settings)) as Box<dyn WordLookup>),
+    ]);
+    let shared_state = Arc::new(AppState { lookups });
 
     let app = Router::new().route(
         "/query",
@@ -35,7 +44,31 @@ async fn main() {
 }
 
 pub struct AppState {
-    lookup: Box<dyn WordLookup>,
+    lookups: HashMap<String, Box<dyn WordLookup>>,
+}
+
+pub struct WiktionaryFetcher {
+    scraper: WiktionaryScraper,
+}
+
+impl WiktionaryFetcher {
+    pub fn new(scraper: WiktionaryScraper) -> Self {
+        Self { scraper }
+    }
+}
+
+impl LookupBackend for WiktionaryFetcher {
+    fn fetch(&self, word: &str) -> impl Future<Output = anyhow::Result<Option<WordDefinition>>> + Send {
+        self.scraper.fetch(word)
+    }
+
+    fn rotate_session(&self) -> impl Future<Output = ()> + Send {
+        async {}
+    }
+
+    fn release_session(&self) -> impl Future<Output = ()> + Send {
+        async {}
+    }
 }
 
 pub struct Fetcher {

@@ -128,3 +128,34 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
         Ok(result)
     }
 }
+
+const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project; tvddaman@gmail.com)";
+
+#[derive(Clone)]
+pub struct PlainHttpRequestMaker {
+    client: reqwest::Client,
+}
+
+impl PlainHttpRequestMaker {
+    pub fn new() -> Self {
+        Self {
+            client: reqwest::Client::builder()
+                .user_agent(PLAIN_USER_AGENT)
+                .build()
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl HttpRequestMaker for PlainHttpRequestMaker {
+    async fn get(&self, url: &str) -> Result<String, FetchError> {
+        let response = self.client.get(url).send().await?;
+        let status = response.status();
+        println!("GET {url} -> status {status}");
+        match status {
+            status if status.is_success() => Ok(response.text().await?),
+            reqwest::StatusCode::NOT_FOUND => Err(FetchError::NotFound(format!("{url} answered 404"))),
+            status => Err(FetchError::Other(anyhow::anyhow!("{url} answered {status}"))),
+        }
+    }
+}

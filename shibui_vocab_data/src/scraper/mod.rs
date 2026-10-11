@@ -2,6 +2,8 @@ pub mod cambridge_dictionary_scraper;
 pub use cambridge_dictionary_scraper::CambridgeDictionaryScraper;
 use serde::Serialize;
 pub mod tratu_coviet;
+pub mod wiktionary_scraper;
+pub use wiktionary_scraper::WiktionaryScraper;
 
 use std::future::Future;
 
