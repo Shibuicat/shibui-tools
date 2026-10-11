@@ -14,6 +14,7 @@ fn definition(word: &str) -> WordDefinition {
     WordDefinition {
         word: word.to_string(),
         classes: Vec::new(),
+        sections: Vec::new(),
         extracted_html: None,
     }
 }

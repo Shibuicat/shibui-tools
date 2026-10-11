@@ -84,6 +84,7 @@ impl<'a> WordPage<'a> {
         Ok(WordDefinition {
             word,
             classes: phrases.iter().map(PhraseSection::get_word_class).collect(),
+            sections: Vec::new(),
             extracted_html: Some(extracted_html),
         })
     }
@@ -106,6 +107,7 @@ impl<'a> WordPage<'a> {
                 .iter()
                 .map(|class| class.get_word_class_definition())
                 .collect(),
+            sections: Vec::new(),
             extracted_html: Some(extracted_html),
         };
 

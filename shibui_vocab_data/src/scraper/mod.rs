@@ -15,6 +15,8 @@ pub trait Scraper {
 pub struct WordDefinition {
     pub word: String,
     pub classes: Vec<WordClass>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sections: Vec<Section>,
     #[serde(skip_serializing)]
     pub extracted_html: Option<String>,
 }
@@ -30,13 +32,30 @@ impl WordDefinition {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Section {
+    pub key: Option<String>,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub class_name: Option<String>,
+    pub items: Vec<SectionItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SectionItem {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
 pub struct WordPronounce {
     pub region: Region,
     pub ipa: String,
     pub link: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub enum Region {
     US,
     UK,
