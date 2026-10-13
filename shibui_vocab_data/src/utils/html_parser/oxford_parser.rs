@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail};
 use scraper::Html;
 
-use super::html_dom::{child_elements, has_class, select_first, text_of};
+use super::html_dom::{child_elements, has_class, select_first, text_of, text_without};
 use super::oxford_fragment::clean_entry;
 use super::oxford_pronunciation::pronounces_of;
 use super::oxford_sections::sections_of;
@@ -32,7 +32,9 @@ impl HtmlParser for OxfordHtmlParser {
             .map(text_of)
             .unwrap_or_else(|| UNKNOWN_CLASS.to_owned());
         let definition = WordDefinition {
-            word: select_first(webtop, "h1.headword").map(text_of).unwrap_or_default(),
+            word: select_first(webtop, "h1.headword")
+                .map(|headword| text_without(headword, &|part| has_class(part, "hm")))
+                .unwrap_or_default(),
             classes: vec![WordClass {
                 class_name: Class::from(class_name.to_lowercase().as_str()),
                 definitions: vec![definition_of(entry)],

@@ -5,6 +5,13 @@ use super::html_dom::{
 };
 use crate::scraper::{Section, SectionItem};
 
+const WORD_LISTS: [(&str, &str); 4] = [
+    ("list=ox3000", "Oxford 3000"),
+    ("list=ox5000", "Oxford 5000"),
+    ("list=opal_written", "OPAL Written"),
+    ("list=opal_spoken", "OPAL Spoken"),
+];
+
 const GENERIC_BOXES: [(&str, &str, &str); 8] = [
     ("synonyms", "synonym-usage", "Synonym Usage"),
     ("langbank", "language-bank", "Language Bank"),
@@ -83,7 +90,7 @@ fn levels(entry: ElementRef, book: &mut SectionBook) {
             symbol
                 .value()
                 .classes()
-                .find_map(|class| class.strip_prefix("ox3ksym_"))
+                .find_map(|class| class.strip_prefix("ox3ksym_").or_else(|| class.strip_prefix("ox5ksym_")))
                 .map(str::to_uppercase)
         })
         .map(|level| plain(format!("Headword: {level}")));
@@ -97,12 +104,8 @@ fn levels(entry: ElementRef, book: &mut SectionBook) {
     let lists = select_all(entry, "div.symbols a")
         .into_iter()
         .filter_map(|anchor| anchor.value().attr("href"))
-        .filter_map(|href| {
-            ["ox3000", "ox5000"]
-                .into_iter()
-                .find(|list| href.contains(&format!("list={list}")))
-        })
-        .map(|list| plain(format!("Oxford {}", &list[2..])));
+        .flat_map(|href| WORD_LISTS.iter().filter(move |(marker, _)| href.contains(marker)))
+        .map(|(_, name)| plain((*name).to_owned()));
     book.add("word-list", "Word lists", lists.collect());
 }
 
@@ -180,13 +183,24 @@ fn boxes(entry: ElementRef, book: &mut SectionBook) {
             "wordorigin" => book.add("etymology", "Word Origin", paragraphs(unbox)),
             "snippet" | "colloc" => book.add("collocation", "Collocations", collocations(unbox)),
             "extra_examples" => book.add("extra-example", "Extra Examples", extra_examples(unbox)),
-            other => {
-                if let Some((_, key, label)) = GENERIC_BOXES.iter().find(|(attribute, _, _)| *attribute == other) {
-                    book.add(key, label, vec![plain(body_text(unbox))]);
-                }
-            }
+            "wordfamily" => book.add("word-family", "Word Family", list_items(unbox)),
+            other => match GENERIC_BOXES.iter().find(|(attribute, _, _)| *attribute == other) {
+                Some((_, key, label)) => book.add(key, label, vec![plain(body_text(unbox))]),
+                None => book.add(&other.replace('_', "-"), &box_title(unbox, other), vec![plain(body_text(unbox))]),
+            },
         }
     });
+}
+
+fn box_title(unbox: ElementRef, fallback: &str) -> String {
+    select_first(unbox, "span.box_title")
+        .map(|title| text_without(title, &|part| has_class(part, "closed")))
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
+fn list_items(unbox: ElementRef) -> Vec<SectionItem> {
+    select_all(unbox, "li").into_iter().map(|item| plain(text_of(item))).collect()
 }
 
 fn verb_forms(unbox: ElementRef) -> Vec<SectionItem> {

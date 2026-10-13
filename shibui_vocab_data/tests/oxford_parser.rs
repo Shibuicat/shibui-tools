@@ -253,3 +253,44 @@ fn an_entry_without_any_sense_is_a_failure() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_none());
 }
+
+#[test]
+fn the_homograph_number_is_not_part_of_the_word() {
+    assert_eq!(parse_fixture("close")["word"], "close");
+}
+
+#[test]
+fn oxford_5000_levels_and_opal_lists_are_kept() {
+    let accomplish = parse_fixture("accomplish");
+    assert!(item_texts(section(&accomplish, "level"))[0].starts_with("Headword: "));
+    assert_eq!(item_texts(section(&accomplish, "word-list")), vec!["Oxford 5000"]);
+
+    let although = parse_fixture("although");
+    let lists = item_texts(section(&although, "word-list"));
+    assert!(lists.contains(&"OPAL Written".to_owned()));
+    assert!(lists.contains(&"OPAL Spoken".to_owned()));
+}
+
+#[test]
+fn the_word_family_box_is_kept_as_a_list() {
+    let definition = parse_fixture("happy");
+
+    let family = item_texts(section(&definition, "word-family"));
+    assert!(family.contains(&"happy adjective (≠ unhappy)".to_owned()));
+    assert!(family.contains(&"happily adverb (≠ unhappily)".to_owned()));
+}
+
+#[test]
+fn a_box_the_parser_does_not_know_is_kept_under_its_own_title() {
+    let html = std::fs::read_to_string("tests/fixtures/oxford_abandon.html").unwrap().replace(
+        "<ol class=\"senses_multiple\"",
+        "<span class=\"unbox\" unbox=\"newbox\"><span class=\"box_title\">Brand New <span class=\"closed\">x</span></span><span class=\"body\"><span class=\"p\">Some text</span></span></span><ol class=\"senses_multiple\"",
+    );
+    assert!(html.contains("newbox"));
+
+    let definition = serde_json::to_value(OxfordHtmlParser.parse(&html).unwrap()).unwrap();
+
+    let kept = section(&definition, "newbox");
+    assert_eq!(kept["label"], "Brand New");
+    assert_eq!(item_texts(kept), vec!["Some text"]);
+}
