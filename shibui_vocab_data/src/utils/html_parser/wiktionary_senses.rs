@@ -1,6 +1,6 @@
 use scraper::ElementRef;
 
-use super::wiktionary_dom::{child_elements, has_class, text_without};
+use super::html_dom::{child_elements, has_class, text_without};
 use crate::scraper::{ClassDefinition, WordContext, WordExplanation, WordUsageExample};
 
 pub fn definition_of(part_of_speech: ElementRef) -> ClassDefinition {

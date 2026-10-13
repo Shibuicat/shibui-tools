@@ -1,7 +1,7 @@
 use anyhow::bail;
 use scraper::{ElementRef, Html, Selector};
 
-use super::wiktionary_dom::{
+use super::html_dom::{
     child_elements, child_sections, first_descendant, heading_of, text_of,
 };
 use super::wiktionary_fragment::clean_html;

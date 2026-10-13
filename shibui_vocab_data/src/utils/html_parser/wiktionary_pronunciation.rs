@@ -1,6 +1,6 @@
 use scraper::{ElementRef, Selector};
 
-use super::wiktionary_dom::{child_elements, text_of};
+use super::html_dom::{child_elements, text_of};
 use crate::scraper::{Region, WordPronounce};
 
 const ORDER: [Region; 2] = [Region::UK, Region::US];

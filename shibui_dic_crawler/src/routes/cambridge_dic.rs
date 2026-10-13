@@ -72,6 +72,7 @@ mod tests {
         HashMap::from([
             ("cambridge".to_owned(), Box::new(Stub) as Box<dyn WordLookup>),
             ("wiktionary".to_owned(), Box::new(Stub) as Box<dyn WordLookup>),
+            ("oxford".to_owned(), Box::new(Stub) as Box<dyn WordLookup>),
         ])
     }
 
@@ -83,11 +84,12 @@ mod tests {
     #[test]
     fn a_known_source_is_found_whatever_its_case() {
         assert!(lookup_for(&lookups(), Some("Wiktionary")).is_ok());
+        assert!(lookup_for(&lookups(), Some("OXFORD")).is_ok());
     }
 
     #[test]
     fn an_unknown_source_is_a_bad_request() {
-        let error = lookup_for(&lookups(), Some("oxford")).err().unwrap();
+        let error = lookup_for(&lookups(), Some("webster")).err().unwrap();
 
         assert_eq!(error.0, StatusCode::BAD_REQUEST);
     }

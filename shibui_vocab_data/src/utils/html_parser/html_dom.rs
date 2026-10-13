@@ -1,4 +1,4 @@
-use scraper::{ElementRef, Node};
+use scraper::{ElementRef, Node, Selector};
 
 pub fn child_elements<'a>(element: ElementRef<'a>) -> impl Iterator<Item = ElementRef<'a>> {
     element.children().filter_map(ElementRef::wrap)
@@ -66,4 +66,27 @@ pub fn first_descendant<'a>(
         .descendants()
         .filter_map(ElementRef::wrap)
         .find(|candidate| matches(*candidate))
+}
+
+pub fn select_all<'a>(scope: ElementRef<'a>, css: &str) -> Vec<ElementRef<'a>> {
+    Selector::parse(css)
+        .map(|selector| scope.select(&selector).collect())
+        .unwrap_or_default()
+}
+
+pub fn select_first<'a>(scope: ElementRef<'a>, css: &str) -> Option<ElementRef<'a>> {
+    select_all(scope, css).into_iter().next()
+}
+
+pub fn has_ancestor_class(element: ElementRef, class: &str) -> bool {
+    element
+        .ancestors()
+        .filter_map(ElementRef::wrap)
+        .any(|ancestor| has_class(ancestor, class))
+}
+
+pub fn path_of(url: &str) -> String {
+    url.split_once("://")
+        .and_then(|(_, rest)| rest.find('/').map(|slash| rest[slash..].to_owned()))
+        .unwrap_or_else(|| url.to_owned())
 }

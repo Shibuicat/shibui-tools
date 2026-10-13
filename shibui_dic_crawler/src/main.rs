@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use axum::{routing::get, Router};
 use shibui_vocab_data::lookup_queue::{LookupBackend, LookupSettings, QueuedWordLookup, WordLookup};
-use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, WiktionaryScraper, WordDefinition};
+use shibui_vocab_data::scraper::page_scraper::PageScraper;
+use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, OxfordScraper, WiktionaryScraper, WordDefinition};
+use shibui_vocab_data::utils::html_parser::HtmlParser;
+use shibui_vocab_data::utils::http_request::HttpRequestMaker;
 mod routes;
 
 #[tokio::main]
@@ -21,12 +24,18 @@ async fn main() {
     let wiktionary_storage_dir = std::env::var("WIKTIONARY_HTML_STORAGE_DIR")
         .unwrap_or_else(|_| "./html_storage_wiktionary".to_string());
     println!("Storing fetched Wiktionary HTML under {wiktionary_storage_dir}");
-    let wiktionary = Arc::new(WiktionaryFetcher::new(WiktionaryScraper::new(wiktionary_storage_dir)));
+    let wiktionary = Arc::new(PageFetcher::new(WiktionaryScraper::new(wiktionary_storage_dir)));
+
+    let oxford_storage_dir =
+        std::env::var("OXFORD_HTML_STORAGE_DIR").unwrap_or_else(|_| "./html_storage_oxford".to_string());
+    println!("Storing fetched Oxford HTML under {oxford_storage_dir}");
+    let oxford = Arc::new(PageFetcher::new(OxfordScraper::new(oxford_storage_dir)));
 
     let settings = LookupSettings::from_env();
     let lookups: HashMap<String, Box<dyn WordLookup>> = HashMap::from([
         (routes::cambridge_dic::DEFAULT_SOURCE.to_owned(), Box::new(QueuedWordLookup::start(fetcher, settings)) as Box<dyn WordLookup>),
         ("wiktionary".to_owned(), Box::new(QueuedWordLookup::start(wiktionary, settings)) as Box<dyn WordLookup>),
+        ("oxford".to_owned(), Box::new(QueuedWordLookup::start(oxford, settings)) as Box<dyn WordLookup>),
     ]);
     let shared_state = Arc::new(AppState { lookups });
 
@@ -47,17 +56,21 @@ pub struct AppState {
     lookups: HashMap<String, Box<dyn WordLookup>>,
 }
 
-pub struct WiktionaryFetcher {
-    scraper: WiktionaryScraper,
+pub struct PageFetcher<R, P> {
+    scraper: PageScraper<R, P>,
 }
 
-impl WiktionaryFetcher {
-    pub fn new(scraper: WiktionaryScraper) -> Self {
+impl<R, P> PageFetcher<R, P> {
+    pub fn new(scraper: PageScraper<R, P>) -> Self {
         Self { scraper }
     }
 }
 
-impl LookupBackend for WiktionaryFetcher {
+impl<R, P> LookupBackend for PageFetcher<R, P>
+where
+    R: HttpRequestMaker + Send + Sync + 'static,
+    P: HtmlParser<Output = WordDefinition> + Send + Sync + 'static,
+{
     fn fetch(&self, word: &str) -> impl Future<Output = anyhow::Result<Option<WordDefinition>>> + Send {
         self.scraper.fetch(word)
     }

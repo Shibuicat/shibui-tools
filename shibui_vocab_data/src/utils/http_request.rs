@@ -41,7 +41,7 @@ impl From<std::io::Error> for FetchError {
 }
 
 pub trait HttpRequestMaker {
-    fn get(&self, url: &str) -> impl Future<Output = Result<String, FetchError>>;
+    fn get(&self, url: &str) -> impl Future<Output = Result<String, FetchError>> + Send;
 }
 
 #[derive(Clone)]
