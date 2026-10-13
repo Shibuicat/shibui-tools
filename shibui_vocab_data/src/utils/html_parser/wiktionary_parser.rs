@@ -60,10 +60,12 @@ impl HtmlParser for WiktionaryHtmlParser {
         collect(english, &[], &mut collected);
 
         let definition = WordDefinition {
-            word: headword_of(english).unwrap_or_default(),
-            classes: collected.classes,
-            sections: collected.sections,
             extracted_html: Some(clean_html(english)),
+            ..WordDefinition::new(
+                headword_of(english).unwrap_or_default(),
+                collected.classes,
+                collected.sections,
+            )
         };
         if !definition.has_meanings() {
             bail!(WordNotFoundError);
@@ -104,11 +106,11 @@ fn collect(scope: ElementRef, inherited: &[WordPronounce], collected: &mut Colle
             collected.sections.extend(etymology_section(section, &label));
             collect(section, &pronounces, collected);
         } else if PARTS_OF_SPEECH.contains(&lowered.as_str()) {
-            collected.classes.push(WordClass {
-                class_name: Class::from(lowered.as_str()),
-                definitions: vec![definition_of(section)],
-                pronounces: pronounces.clone(),
-            });
+            collected.classes.push(WordClass::new(
+                Class::from(lowered.as_str()),
+                vec![definition_of(section)],
+                pronounces.clone(),
+            ));
             child_sections(section).for_each(|nested| {
                 collected.sections.extend(list_section(nested, Some(&lowered)));
             });
@@ -123,7 +125,7 @@ fn etymology_section(section: ElementRef, label: &str) -> Option<Section> {
         .filter(|child| child.value().name() == "p")
         .map(text_of)
         .filter(|text| !text.is_empty())
-        .map(|text| SectionItem { text, link: None })
+        .map(|text| SectionItem::new(text, None))
         .collect::<Vec<_>>();
     (!items.is_empty()).then(|| Section {
         key: Some("etymology".to_owned()),
@@ -197,10 +199,7 @@ fn item_of(element: ElementRef) -> SectionItem {
         .or_else(|| first_descendant(element, &|candidate| candidate.value().name() == "a"))
         .and_then(|anchor| anchor.value().attr("href"))
         .map(link_target);
-    SectionItem {
-        text: text_of(element),
-        link,
-    }
+    SectionItem::new(text_of(element), link)
 }
 
 fn link_target(href: &str) -> String {

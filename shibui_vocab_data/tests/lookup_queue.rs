@@ -11,12 +11,7 @@ use shibui_vocab_data::scraper::WordDefinition;
 use tokio::sync::Semaphore;
 
 fn definition(word: &str) -> WordDefinition {
-    WordDefinition {
-        word: word.to_string(),
-        classes: Vec::new(),
-        sections: Vec::new(),
-        extracted_html: None,
-    }
+    WordDefinition::new(word.to_string(), Vec::new(), Vec::new())
 }
 
 struct FakeBackend {

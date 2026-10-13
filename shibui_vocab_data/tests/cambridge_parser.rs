@@ -41,7 +41,7 @@ fn phrase_style_page_is_parsed_as_a_phrase_class() {
 
     assert_eq!(definition["word"], "ablutions");
     assert_eq!(definition["classes"][0]["className"], "phrase");
-    assert_eq!(definition["classes"][0]["pronounces"], serde_json::json!([]));
+    assert_eq!(definition["classes"][0]["pronunciations"], serde_json::json!([]));
     assert!(definition["classes"][0]["definitions"][0]["contexts"][0]["meanings"][0]
         ["explanation"]
         .as_str()

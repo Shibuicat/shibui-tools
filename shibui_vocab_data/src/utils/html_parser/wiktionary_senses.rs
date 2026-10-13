@@ -52,10 +52,7 @@ fn sub_senses(sense: ElementRef) -> Option<Vec<ElementRef>> {
 }
 
 fn meaning_of(sense: ElementRef) -> WordExplanation {
-    WordExplanation {
-        explanation: explanation_of(sense),
-        examples: examples_of(sense),
-    }
+    WordExplanation::new(explanation_of(sense), examples_of(sense))
 }
 
 fn is_not_definition_text(element: ElementRef) -> bool {
@@ -73,7 +70,7 @@ fn examples_of(sense: ElementRef) -> Vec<WordUsageExample> {
         .filter(|entry| entry.value().name() == "dd")
         .flat_map(|entry| entry.descendants().filter_map(ElementRef::wrap))
         .filter(|candidate| has_class(*candidate, "h-usage-example"))
-        .map(|example| WordUsageExample(text_without(example, &|_| false)))
-        .filter(|example| !example.0.is_empty())
+        .map(|example| WordUsageExample::plain(text_without(example, &|_| false)))
+        .filter(|example| !example.text.is_empty())
         .collect()
 }

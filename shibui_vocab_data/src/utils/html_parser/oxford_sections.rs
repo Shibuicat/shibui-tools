@@ -61,7 +61,7 @@ fn extend_unique(into: &mut Vec<SectionItem>, items: Vec<SectionItem>) {
 }
 
 fn plain(text: String) -> SectionItem {
-    SectionItem { text, link: None }
+    SectionItem::new(text, None)
 }
 
 fn outside_idioms(element: &ElementRef) -> bool {
@@ -124,9 +124,11 @@ fn relations(entry: ElementRef, book: &mut SectionBook) {
 fn references_in(scope: ElementRef) -> Vec<SectionItem> {
     select_all(scope, "a.Ref")
         .into_iter()
-        .map(|anchor| SectionItem {
-            text: select_first(anchor, "span.xh").or(Some(anchor)).map(text_of).unwrap_or_default(),
-            link: anchor.value().attr("href").map(word_link),
+        .map(|anchor| {
+            SectionItem::new(
+                select_first(anchor, "span.xh").or(Some(anchor)).map(text_of).unwrap_or_default(),
+                anchor.value().attr("href").map(word_link),
+            )
         })
         .collect()
 }
@@ -147,13 +149,13 @@ fn topics(entry: ElementRef, book: &mut SectionBook) {
         .map(|anchor| {
             let name = select_first(anchor, "span.topic_name").map(text_of).unwrap_or_default();
             let level = select_first(anchor, "span.topic_cefr").map(text_of);
-            SectionItem {
-                text: match level {
+            SectionItem::new(
+                match level {
                     Some(level) => format!("{name} ({level})"),
                     None => name,
                 },
-                link: anchor.value().attr("href").map(path_of),
-            }
+                anchor.value().attr("href").map(path_of),
+            )
         })
         .collect();
     book.add("topic", "Topics", items);
@@ -257,9 +259,11 @@ fn idioms(entry: ElementRef, book: &mut SectionBook) {
 }
 
 fn phrasal_verbs(entry: ElementRef, book: &mut SectionBook) {
-    let items = select_all(entry, "aside.phrasal_verb_links a.Ref").into_iter().map(|anchor| SectionItem {
-        text: select_first(anchor, "span.xh").map(text_of).unwrap_or_else(|| text_of(anchor)),
-        link: anchor.value().attr("href").map(word_link),
+    let items = select_all(entry, "aside.phrasal_verb_links a.Ref").into_iter().map(|anchor| {
+        SectionItem::new(
+            select_first(anchor, "span.xh").map(text_of).unwrap_or_else(|| text_of(anchor)),
+            anchor.value().attr("href").map(word_link),
+        )
     });
     book.add("phrasal-verb", "Phrasal Verbs", items.collect());
 }

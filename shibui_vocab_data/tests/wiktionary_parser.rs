@@ -95,7 +95,7 @@ fn usage_examples_are_collected_and_quotations_are_not() {
     let examples = meanings
         .iter()
         .flat_map(|meaning| meaning["examples"].as_array().unwrap().iter())
-        .map(|example| example.as_str().unwrap().to_owned())
+        .map(|example| example["text"].as_str().unwrap().to_owned())
         .collect::<Vec<_>>();
 
     assert!(examples.iter().all(|example| !example.contains("Macaulay")));
@@ -123,16 +123,16 @@ fn a_sense_with_sub_senses_becomes_a_context_described_by_the_parent() {
 #[test]
 fn pronunciation_gives_uk_and_us_with_ipa_and_audio_path() {
     let definition = parse_fixture("beautiful");
-    let pronounces = definition["classes"][0]["pronounces"].as_array().unwrap();
+    let pronunciations = definition["classes"][0]["pronunciations"].as_array().unwrap();
 
-    assert_eq!(pronounces[0]["region"], "UK");
-    assert_eq!(pronounces[0]["ipa"], "/ˈbjuːtɪ.fəl/");
+    assert_eq!(pronunciations[0]["region"], "UK");
+    assert_eq!(pronunciations[0]["ipa"], "/ˈbjuːtɪ.fəl/");
     assert_eq!(
-        pronounces[0]["link"],
+        pronunciations[0]["link"],
         "/wikipedia/commons/transcoded/e/ea/En-uk-beautiful.ogg/En-uk-beautiful.ogg.mp3"
     );
-    assert_eq!(pronounces[1]["region"], "US");
-    assert!(pronounces[1]["link"].as_str().unwrap().ends_with("En-us-beautiful.ogg.mp3"));
+    assert_eq!(pronunciations[1]["region"], "US");
+    assert!(pronunciations[1]["link"].as_str().unwrap().ends_with("En-us-beautiful.ogg.mp3"));
 }
 
 #[test]
@@ -140,8 +140,8 @@ fn every_class_of_the_page_gets_the_page_pronunciation() {
     let definition = parse_fixture("beautiful");
 
     assert_eq!(
-        definition["classes"][0]["pronounces"],
-        definition["classes"][1]["pronounces"]
+        definition["classes"][0]["pronunciations"],
+        definition["classes"][1]["pronunciations"]
     );
 }
 

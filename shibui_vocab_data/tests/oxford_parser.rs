@@ -46,14 +46,14 @@ fn the_headword_and_the_part_of_speech_are_read() {
 fn uk_and_us_pronunciations_carry_ipa_and_a_host_less_audio_path() {
     let definition = parse_fixture("accomplish");
 
-    let pronounces = definition["classes"][0]["pronounces"].as_array().unwrap();
-    assert_eq!(pronounces.len(), 2);
-    assert_eq!(pronounces[0]["region"], "UK");
-    assert_eq!(pronounces[0]["ipa"], "/əˈkʌmplɪʃ/");
-    assert_eq!(pronounces[1]["region"], "US");
-    assert_eq!(pronounces[1]["ipa"], "/əˈkɑːmplɪʃ/");
-    assert!(pronounces[0]["link"].as_str().unwrap().starts_with("/media/english/uk_pron/"));
-    assert!(pronounces[1]["link"].as_str().unwrap().ends_with(".mp3"));
+    let pronunciations = definition["classes"][0]["pronunciations"].as_array().unwrap();
+    assert_eq!(pronunciations.len(), 2);
+    assert_eq!(pronunciations[0]["region"], "UK");
+    assert_eq!(pronunciations[0]["ipa"], "/əˈkʌmplɪʃ/");
+    assert_eq!(pronunciations[1]["region"], "US");
+    assert_eq!(pronunciations[1]["ipa"], "/əˈkɑːmplɪʃ/");
+    assert!(pronunciations[0]["link"].as_str().unwrap().starts_with("/media/english/uk_pron/"));
+    assert!(pronunciations[1]["link"].as_str().unwrap().ends_with(".mp3"));
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn each_sense_becomes_a_context_with_its_definition_and_examples() {
         first["explanation"],
         "to leave somebody, especially somebody you are responsible for, with no intention of returning"
     );
-    assert_eq!(first["examples"][0], "The baby had been abandoned by its mother.");
+    assert_eq!(first["examples"][0]["text"], "The baby had been abandoned by its mother.");
     assert_eq!(first["examples"].as_array().unwrap().len(), 3);
 }
 

@@ -82,10 +82,12 @@ impl<'a> WordPage<'a> {
             .join("\n");
 
         Ok(WordDefinition {
-            word,
-            classes: phrases.iter().map(PhraseSection::get_word_class).collect(),
-            sections: Vec::new(),
             extracted_html: Some(extracted_html),
+            ..WordDefinition::new(
+                word,
+                phrases.iter().map(PhraseSection::get_word_class).collect(),
+                Vec::new(),
+            )
         })
     }
 
@@ -102,13 +104,15 @@ impl<'a> WordPage<'a> {
             .collect::<Vec<_>>()
             .join("\n");
         let word_definition = WordDefinition {
-            word,
-            classes: word_classes
-                .iter()
-                .map(|class| class.get_word_class_definition())
-                .collect(),
-            sections: Vec::new(),
             extracted_html: Some(extracted_html),
+            ..WordDefinition::new(
+                word,
+                word_classes
+                    .iter()
+                    .map(|class| class.get_word_class_definition())
+                    .collect(),
+                Vec::new(),
+            )
         };
 
         Ok(word_definition)
@@ -137,15 +141,14 @@ impl<'a> WordClassSection<'a> {
     pub fn get_word_class_definition(&self) -> WordClass {
         let header = self.header();
 
-        WordClass {
-            class_name: header.get_class(),
-            pronounces: header.get_pronounces(),
-            definitions: self
-                .definitions()
+        WordClass::new(
+            header.get_class(),
+            self.definitions()
                 .iter()
                 .map(|x| x.get_definition())
                 .collect(),
-        }
+            header.get_pronounces(),
+        )
     }
 
     pub fn definitions(&'a self) -> Vec<ClassDefinitionSection<'a>> {
@@ -390,20 +393,17 @@ impl<'a> WordMeaningBlock<'a> {
         let selector = Selector::parse(".examp.dexamp").unwrap();
         self.inner_html_ele
             .select(&selector)
-            .map(|x| WordUsageExample {
-                0: x.text().fold("".to_owned(), |mut acc, e| {
+            .map(|x| {
+                WordUsageExample::plain(x.text().fold("".to_owned(), |mut acc, e| {
                     acc.push_str(e);
                     acc
-                }),
+                }))
             })
             .collect()
     }
 
     pub fn get_meaning(&self) -> WordExplanation {
-        WordExplanation {
-            explanation: self.get_explanation(),
-            examples: self.get_examples(),
-        }
+        WordExplanation::new(self.get_explanation(), self.get_examples())
     }
 }
 
@@ -449,15 +449,15 @@ impl<'a> PhraseSection<'a> {
             .map(|block| block.get_meaning())
             .collect();
 
-        WordClass {
-            class_name: self.get_class(),
-            pronounces: vec![],
-            definitions: vec![ClassDefinition {
+        WordClass::new(
+            self.get_class(),
+            vec![ClassDefinition {
                 contexts: vec![WordContext {
                     description: None,
                     meanings,
                 }],
             }],
-        }
+            vec![],
+        )
     }
 }

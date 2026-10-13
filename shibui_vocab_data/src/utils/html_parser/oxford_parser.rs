@@ -32,16 +32,18 @@ impl HtmlParser for OxfordHtmlParser {
             .map(text_of)
             .unwrap_or_else(|| UNKNOWN_CLASS.to_owned());
         let definition = WordDefinition {
-            word: select_first(webtop, "h1.headword")
-                .map(|headword| text_without(headword, &|part| has_class(part, "hm")))
-                .unwrap_or_default(),
-            classes: vec![WordClass {
-                class_name: Class::from(class_name.to_lowercase().as_str()),
-                definitions: vec![definition_of(entry)],
-                pronounces: pronounces_of(webtop),
-            }],
-            sections: sections_of(entry),
             extracted_html: Some(clean_entry(content)),
+            ..WordDefinition::new(
+                select_first(webtop, "h1.headword")
+                    .map(|headword| text_without(headword, &|part| has_class(part, "hm")))
+                    .unwrap_or_default(),
+                vec![WordClass::new(
+                    Class::from(class_name.to_lowercase().as_str()),
+                    vec![definition_of(entry)],
+                    pronounces_of(webtop),
+                )],
+                sections_of(entry),
+            )
         };
         if !definition.has_meanings() {
             bail!(layout_changed());

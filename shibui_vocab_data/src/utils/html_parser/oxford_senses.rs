@@ -52,12 +52,12 @@ fn context_of(group: Option<String>, sense: ElementRef) -> Option<WordContext> {
         .filter(|part| has_class(**part, "examples"))
         .flat_map(|list| child_elements(*list))
         .filter_map(|item| child_elements(item).find(|child| has_class(*child, "x")))
-        .map(|example| WordUsageExample(text_of(example)))
+        .map(|example| WordUsageExample::plain(text_of(example)))
         .collect();
 
     Some(WordContext {
         description: (!description.is_empty()).then_some(description),
-        meanings: vec![WordExplanation { explanation, examples }],
+        meanings: vec![WordExplanation::new(explanation, examples)],
     })
 }
 
