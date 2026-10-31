@@ -208,72 +208,46 @@ impl<'a> WordClassHeaderSection<'a> {
     }
 
     pub fn get_pronounces(&self) -> Vec<WordPronounce> {
-        let mut result = vec![];
-
-        let uk_ipa = self.get_uk_ipa();
-
-        if uk_ipa.is_some() {
-            result.push(WordPronounce {
-                ipa: uk_ipa.unwrap(),
-                link: self.get_uk_sound_link().unwrap_or_default(),
-                region: Region::UK,
+        [(Region::UK, ".uk.dpron-i"), (Region::US, ".us.dpron-i")]
+            .into_iter()
+            .flat_map(|(region, selector)| self.pronunciations_of(region, selector))
+            .fold(Vec::new(), |mut unique, pronounce| {
+                let seen = unique.iter().any(|existing| {
+                    existing.region == pronounce.region
+                        && existing.ipa == pronounce.ipa
+                        && existing.link == pronounce.link
+                });
+                if !seen {
+                    unique.push(pronounce);
+                }
+                unique
             })
-        }
-
-        result.push(WordPronounce {
-            ipa: self.get_us_ipa().map_or_else(|| "".to_string(), |x| x),
-            link: self.get_us_sound_link(),
-            region: Region::US,
-        });
-
-        result
     }
 
-    fn get_uk_sound_link(&self) -> Option<String> {
-        let selector = Selector::parse("audio source").unwrap();
-        let source_tag = self.inner_html_ele.select(&selector).next();
-        if source_tag.is_some() {
-            let src = source_tag.unwrap().attr("src").unwrap();
+    fn pronunciations_of(&self, region: Region, block_selector: &str) -> Vec<WordPronounce> {
+        let blocks = Selector::parse(block_selector).unwrap();
+        let ipa = Selector::parse(".ipa.dipa.lpr-2.lpl-1").unwrap();
+        let sound = Selector::parse("audio source").unwrap();
 
-            return Some(src.to_string());
-        }
-
-        return None;
-    }
-
-    fn get_us_sound_link(&self) -> String {
-        let selector = Selector::parse(".us.dpron-i audio source").unwrap();
-        let source_tag = self.inner_html_ele.select(&selector).next();
-        if source_tag.is_none() {
-            return "".to_string();
-        }
-
-        let src = source_tag.unwrap().attr("src").unwrap();
-        return src.to_string();
-    }
-
-    fn get_uk_ipa(&self) -> Option<String> {
-        let selector = Selector::parse(".uk.dpron-i .ipa.dipa.lpr-2.lpl-1").unwrap();
-        let ipa = self.inner_html_ele.select(&selector).next();
-
-        if ipa.is_some() {
-            let ipa_text = ipa.unwrap().text().next().unwrap();
-
-            return Some(ipa_text.to_string());
-        }
-
-        return None;
-    }
-
-    fn get_us_ipa(&self) -> Option<String> {
-        let selector = Selector::parse(".us.dpron-i .ipa.dipa.lpr-2.lpl-1").unwrap();
-        let tag = self.inner_html_ele.select(&selector).next();
-        if tag.is_some() {
-            let ipa = tag.unwrap().text().next().unwrap();
-            return Some(ipa.to_string());
-        }
-
-        None
+        self.inner_html_ele
+            .select(&blocks)
+            .map(|block| WordPronounce {
+                region: region.clone(),
+                ipa: block
+                    .select(&ipa)
+                    .next()
+                    .and_then(|tag| tag.text().next())
+                    .unwrap_or_default()
+                    .to_string(),
+                link: block
+                    .select(&sound)
+                    .next()
+                    .and_then(|tag| tag.attr("src"))
+                    .unwrap_or_default()
+                    .to_string(),
+            })
+            .filter(|pronounce| !pronounce.ipa.is_empty() || !pronounce.link.is_empty())
+            .collect()
     }
 }
 
