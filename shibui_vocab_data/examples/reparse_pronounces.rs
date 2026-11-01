@@ -15,7 +15,7 @@ fn pronounces_by_class(html: &str) -> Option<serde_json::Value> {
                         .map(|class| {
                             serde_json::json!({
                                 "name": class["className"],
-                                "pronounces": class["pronounces"],
+                                "pronounces": class["pronunciations"],
                             })
                         })
                         .collect()

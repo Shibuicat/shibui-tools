@@ -101,7 +101,7 @@ fn activator_with_pronunciations(blocks: &[String]) -> WordDefinition {
 }
 
 fn pronounces(definition: &WordDefinition) -> serde_json::Value {
-    as_json(definition)["classes"][0]["pronounces"].clone()
+    as_json(definition)["classes"][0]["pronunciations"].clone()
 }
 
 #[test]
