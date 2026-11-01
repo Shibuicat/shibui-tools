@@ -129,7 +129,7 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
     }
 }
 
-const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project; tvddaman@gmail.com)";
+const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project)";
 
 #[derive(Clone)]
 pub struct PlainHttpRequestMaker {
