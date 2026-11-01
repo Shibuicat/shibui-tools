@@ -9,7 +9,17 @@ fn pronounces_by_class(html: &str) -> Option<serde_json::Value> {
             let json = serde_json::to_value(&definition).unwrap();
             json["classes"]
                 .as_array()
-                .map(|classes| classes.iter().map(|class| class["pronounces"].clone()).collect())
+                .map(|classes| {
+                    classes
+                        .iter()
+                        .map(|class| {
+                            serde_json::json!({
+                                "name": class["className"],
+                                "pronounces": class["pronounces"],
+                            })
+                        })
+                        .collect()
+                })
                 .unwrap_or_default()
         })
 }
