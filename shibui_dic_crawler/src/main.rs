@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::{routing::get, Router};
 use shibui_vocab_data::lookup_queue::{LookupBackend, LookupSettings, QueuedWordLookup, WordLookup};
 use shibui_vocab_data::scraper::page_scraper::PageScraper;
-use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, MerriamWebsterScraper, OxfordScraper, WiktionaryScraper, WordDefinition};
+use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, CollinsScraper, DictionaryComScraper, MerriamWebsterScraper, OxfordScraper, WiktionaryScraper, WordDefinition};
 use shibui_vocab_data::utils::http_request::ChallengeHttpRequestMaker;
 use shibui_vocab_data::utils::html_parser::HtmlParser;
 use shibui_vocab_data::utils::http_request::HttpRequestMaker;
@@ -38,11 +38,24 @@ async fn main() {
     let merriam_webster = Arc::new(SessionPageFetcher::new(MerriamWebsterScraper::new(merriam_webster_storage_dir)));
     merriam_webster.start_session().await;
 
+    let collins_storage_dir =
+        std::env::var("COLLINS_HTML_STORAGE_DIR").unwrap_or_else(|_| "./html_storage_collins".to_string());
+    println!("Storing fetched Collins HTML under {collins_storage_dir}");
+    let collins = Arc::new(SessionPageFetcher::new(CollinsScraper::new(collins_storage_dir)));
+    collins.start_session().await;
+
+    let dictionary_com_storage_dir = std::env::var("DICTIONARY_COM_HTML_STORAGE_DIR")
+        .unwrap_or_else(|_| "./html_storage_dictionary_com".to_string());
+    println!("Storing fetched Dictionary.com HTML under {dictionary_com_storage_dir}");
+    let dictionary_com = Arc::new(PageFetcher::new(DictionaryComScraper::new(dictionary_com_storage_dir)));
+
     let settings = LookupSettings::from_env();
     let lookups: HashMap<String, Box<dyn WordLookup>> = HashMap::from([
         (routes::cambridge_dic::DEFAULT_SOURCE.to_owned(), Box::new(QueuedWordLookup::start(fetcher, settings)) as Box<dyn WordLookup>),
         ("wiktionary".to_owned(), Box::new(QueuedWordLookup::start(wiktionary, settings)) as Box<dyn WordLookup>),
         ("oxford".to_owned(), Box::new(QueuedWordLookup::start(oxford, settings)) as Box<dyn WordLookup>),
+        ("collins".to_owned(), Box::new(QueuedWordLookup::start(collins, settings)) as Box<dyn WordLookup>),
+        ("dictionary-com".to_owned(), Box::new(QueuedWordLookup::start(dictionary_com, settings)) as Box<dyn WordLookup>),
         ("merriam-webster".to_owned(), Box::new(QueuedWordLookup::start(merriam_webster, settings)) as Box<dyn WordLookup>),
     ]);
     let shared_state = Arc::new(AppState { lookups });

@@ -1,4 +1,12 @@
 mod cambridge_elements;
+mod collins_fragment;
+pub mod collins_parser;
+mod collins_sections;
+mod collins_senses;
+mod dictionary_com_fragment;
+pub mod dictionary_com_parser;
+mod dictionary_com_sections;
+mod dictionary_com_senses;
 pub mod cambridge_parser;
 mod html_dom;
 mod merriam_webster_fragment;
