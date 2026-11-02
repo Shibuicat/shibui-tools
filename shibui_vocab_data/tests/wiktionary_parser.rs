@@ -13,10 +13,10 @@ fn parse_fixture(name: &str) -> serde_json::Value {
 }
 
 fn class_names(definition: &serde_json::Value) -> Vec<String> {
-    definition["classes"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let groups = definition["groups"].as_array().cloned().unwrap_or_default();
+    std::iter::once(definition["classes"].clone())
+        .chain(groups.into_iter().map(|group| group["classes"].clone()))
+        .flat_map(|classes| classes.as_array().unwrap().clone())
         .map(|class| class["className"].as_str().unwrap().to_owned())
         .collect()
 }
@@ -68,7 +68,38 @@ fn plain_senses_share_one_context_without_a_description() {
     assert!(meanings[0]["explanation"]
         .as_str()
         .unwrap()
-        .starts_with("(transitive) To give up or relinquish control of"));
+        .starts_with("To give up or relinquish control of"));
+    assert_eq!(meanings[0]["labels"][0]["kind"], "usage");
+    assert_eq!(meanings[0]["labels"][0]["text"], "transitive");
+}
+
+#[test]
+fn the_headword_line_gives_the_inflected_forms_with_their_labels() {
+    let definition = parse_fixture("abandon");
+
+    let forms = definition["classes"][0]["forms"].as_array().unwrap();
+    assert_eq!(forms[0]["label"], "third-person singular simple present");
+    assert_eq!(forms[0]["text"], "abandons");
+    assert_eq!(forms[2]["text"], "abandoned");
+}
+
+#[test]
+fn countable_and_uncountable_tags_become_the_class_grammar() {
+    let definition = parse_fixture("fish");
+
+    assert_eq!(definition["classes"][0]["grammar"], "countable and uncountable");
+    assert_eq!(definition["classes"][0]["forms"][1]["label"], "plural");
+}
+
+#[test]
+fn the_second_and_later_etymologies_become_numbered_groups() {
+    let definition = parse_fixture("abandon");
+
+    let group = &definition["groups"][0];
+    assert_eq!(group["key"], "etymology-2");
+    assert_eq!(group["kind"], "etymology");
+    assert_eq!(group["label"], "Etymology 2");
+    assert_eq!(group["classes"][0]["className"], "Noun");
 }
 
 #[test]
@@ -167,10 +198,10 @@ fn etymology_text_is_a_section_without_class() {
 #[test]
 fn each_numbered_etymology_is_its_own_section() {
     let definition = parse_fixture("abandon");
-    let labels = definition["sections"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let groups = definition["groups"].as_array().cloned().unwrap_or_default();
+    let labels = std::iter::once(definition["sections"].clone())
+        .chain(groups.into_iter().map(|group| group["sections"].clone()))
+        .flat_map(|sections| sections.as_array().unwrap().clone())
         .filter(|section| section["key"] == "etymology")
         .map(|section| section["label"].as_str().unwrap().to_owned())
         .collect::<Vec<_>>();

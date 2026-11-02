@@ -2,14 +2,14 @@ use anyhow::bail;
 use scraper::{ElementRef, Html, Selector};
 
 use super::html_dom::{
-    child_elements, child_sections, first_descendant, heading_of, text_of,
+    child_elements, child_sections, first_descendant, has_class, heading_of, select_first, text_of,
 };
 use super::wiktionary_fragment::clean_html;
 use super::wiktionary_pronunciation::pronounces_of;
 use super::wiktionary_senses::definition_of;
 use super::{HtmlParser, WordNotFoundError};
 use crate::scraper::{
-    Class, Section, SectionItem, WordClass, WordDefinition, WordPronounce,
+    Class, Group, Section, SectionItem, WordClass, WordDefinition, WordForm, WordPronounce,
 };
 
 const PARTS_OF_SPEECH: [&str; 19] = [
@@ -44,6 +44,22 @@ pub struct WiktionaryHtmlParser;
 struct Collected {
     classes: Vec<WordClass>,
     sections: Vec<Section>,
+    etymologies: Vec<(String, Collected)>,
+}
+
+impl Collected {
+    fn into_group(self, number: usize, label: String) -> Group {
+        Group {
+            key: format!("etymology-{number}"),
+            kind: "etymology".to_owned(),
+            label,
+            attribution: None,
+            frequency: None,
+            pronunciations: Vec::new(),
+            classes: self.classes,
+            sections: self.sections,
+        }
+    }
 }
 
 impl HtmlParser for WiktionaryHtmlParser {
@@ -57,15 +73,24 @@ impl HtmlParser for WiktionaryHtmlParser {
         };
 
         let mut collected = Collected::default();
-        collect(english, &[], &mut collected);
+        let split = child_sections(english).filter(|section| is_etymology(*section)).count() > 1;
+        collect(english, &[], &mut collected, split);
+
+        let mut etymologies = collected.etymologies.into_iter();
+        let (mut classes, mut sections) = (collected.classes, collected.sections);
+        if let Some((_, first)) = etymologies.next() {
+            classes.extend(first.classes);
+            sections.extend(first.sections);
+        }
+        let groups = etymologies
+            .enumerate()
+            .map(|(index, (label, part))| part.into_group(index + 2, label))
+            .collect();
 
         let definition = WordDefinition {
+            groups,
             extracted_html: Some(clean_html(english)),
-            ..WordDefinition::new(
-                headword_of(english).unwrap_or_default(),
-                collected.classes,
-                collected.sections,
-            )
+            ..WordDefinition::new(headword_of(english).unwrap_or_default(), classes, sections)
         };
         if !definition.has_meanings() {
             bail!(WordNotFoundError);
@@ -92,7 +117,11 @@ fn heading_text(section: ElementRef) -> String {
     heading_of(section).map(text_of).unwrap_or_default()
 }
 
-fn collect(scope: ElementRef, inherited: &[WordPronounce], collected: &mut Collected) {
+fn is_etymology(section: ElementRef) -> bool {
+    heading_text(section).to_lowercase().starts_with("etymology")
+}
+
+fn collect(scope: ElementRef, inherited: &[WordPronounce], collected: &mut Collected, split: bool) {
     let pronounces = child_sections(scope)
         .find(|section| heading_text(*section).eq_ignore_ascii_case("pronunciation"))
         .map(pronounces_of)
@@ -102,21 +131,53 @@ fn collect(scope: ElementRef, inherited: &[WordPronounce], collected: &mut Colle
         let label = heading_text(section);
         let lowered = label.to_lowercase();
 
-        if lowered.starts_with("etymology") {
+        if lowered.starts_with("etymology") && split {
+            let mut part = Collected::default();
+            part.sections.extend(etymology_section(section, &label));
+            collect(section, &pronounces, &mut part, false);
+            collected.etymologies.push((label, part));
+        } else if lowered.starts_with("etymology") {
             collected.sections.extend(etymology_section(section, &label));
-            collect(section, &pronounces, collected);
+            collect(section, &pronounces, collected, false);
         } else if PARTS_OF_SPEECH.contains(&lowered.as_str()) {
-            collected.classes.push(WordClass::new(
+            let mut class = WordClass::new(
                 Class::from(lowered.as_str()),
                 vec![definition_of(section)],
                 pronounces.clone(),
-            ));
+            );
+            apply_headword_line(section, &mut class);
+            collected.classes.push(class);
             child_sections(section).for_each(|nested| {
                 collected.sections.extend(list_section(nested, Some(&lowered)));
             });
         } else if lowered != "pronunciation" {
             collected.sections.extend(list_section(section, None));
         }
+    });
+}
+
+fn apply_headword_line(section: ElementRef, class: &mut WordClass) {
+    let Some(line) = select_first(section, "span.headword-line") else {
+        return;
+    };
+    let mut label: Option<String> = None;
+    child_elements(line).for_each(|part| match part.value().name() {
+        "i" if select_first(part, "a[href*=\"Glossary\"]").is_some() => {
+            class.grammar = Some(text_of(part)).filter(|text| !text.is_empty());
+        }
+        "i" => {
+            let text = text_of(part);
+            if !matches!(text.as_str(), "or" | "and" | "") {
+                label = Some(text);
+            }
+        }
+        "b" if has_class(part, "form-of") => class.forms.push(WordForm {
+            label: label.clone(),
+            text: text_of(part),
+            audio: None,
+            pronunciations: Vec::new(),
+        }),
+        _ => {}
     });
 }
 

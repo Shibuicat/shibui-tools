@@ -1,9 +1,8 @@
 use scraper::ElementRef;
 
 use super::html_dom::{child_elements, has_class, text_of};
-use crate::scraper::{ClassDefinition, WordContext, WordExplanation, WordUsageExample};
-
-const DESCRIPTION_CLASSES: [&str; 5] = ["grammar", "labels", "dis-g", "use", "cf"];
+use super::html_dom::{select_first, text_without};
+use crate::scraper::{ClassDefinition, Label, WordContext, WordExplanation, WordUsageExample};
 
 pub fn definition_of(entry: ElementRef) -> ClassDefinition {
     ClassDefinition {
@@ -36,29 +35,60 @@ fn grouped_senses(list: ElementRef) -> Vec<(Option<String>, ElementRef)> {
 fn context_of(group: Option<String>, sense: ElementRef) -> Option<WordContext> {
     let parts = parts_of(sense);
     let explanation = parts.iter().find(|part| has_class(**part, "def")).map(|def| text_of(*def))?;
-    let description = group
-        .into_iter()
-        .chain(
-            parts
-                .iter()
-                .filter(|part| DESCRIPTION_CLASSES.iter().any(|class| has_class(**part, class)))
-                .map(|part| text_of(*part)),
-        )
-        .filter(|text| !text.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
     let examples = parts
         .iter()
         .filter(|part| has_class(**part, "examples"))
         .flat_map(|list| child_elements(*list))
-        .filter_map(|item| child_elements(item).find(|child| has_class(*child, "x")))
-        .map(|example| WordUsageExample::plain(text_of(example)))
+        .filter_map(example_of)
         .collect();
 
+    let mut meaning = WordExplanation::new(explanation, examples);
+    meaning.level = sense.value().attr("cefr").map(str::to_uppercase);
+    meaning.grammar = text_of_class(&parts, "grammar").map(|text| trim_marks(&text));
+    meaning.pattern = text_of_class(&parts, "cf");
+    meaning.labels = labels_of(&parts);
+    meaning.notes = parts.iter().filter(|part| has_class(**part, "use")).map(|part| text_of(*part)).collect();
+
     Some(WordContext {
-        description: (!description.is_empty()).then_some(description),
-        meanings: vec![WordExplanation::new(explanation, examples)],
+        description: group.filter(|text| !text.is_empty()),
+        meanings: vec![meaning],
     })
+}
+
+fn example_of(item: ElementRef) -> Option<WordUsageExample> {
+    let example = child_elements(item).find(|child| has_class(*child, "x"))?;
+    Some(WordUsageExample {
+        text: text_without(example, &|part| has_class(part, "gloss")),
+        pattern: child_elements(item).find(|child| has_class(*child, "cf")).map(text_of),
+        gloss: select_first(example, "span.gloss").map(text_of),
+        ..WordUsageExample::default()
+    })
+}
+
+fn labels_of(parts: &[ElementRef]) -> Vec<Label> {
+    [("labels", "usage"), ("dis-g", "domain")]
+        .into_iter()
+        .flat_map(|(class, kind)| {
+            parts
+                .iter()
+                .filter(move |part| has_class(**part, class))
+                .map(move |part| (kind, trim_marks(&text_of(*part))))
+        })
+        .filter(|(_, text)| !text.is_empty())
+        .map(|(kind, text)| Label { kind: kind.to_owned(), text })
+        .collect()
+}
+
+fn text_of_class(parts: &[ElementRef], class: &str) -> Option<String> {
+    parts
+        .iter()
+        .find(|part| has_class(**part, class))
+        .map(|part| text_of(*part))
+        .filter(|text| !text.is_empty())
+}
+
+fn trim_marks(text: &str) -> String {
+    text.trim_matches(|c: char| matches!(c, '[' | ']' | '(' | ')') || c.is_whitespace()).to_owned()
 }
 
 fn parts_of(sense: ElementRef) -> Vec<ElementRef> {

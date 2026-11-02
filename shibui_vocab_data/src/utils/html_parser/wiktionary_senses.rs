@@ -1,7 +1,8 @@
 use scraper::ElementRef;
 
 use super::html_dom::{child_elements, has_class, text_without};
-use crate::scraper::{ClassDefinition, WordContext, WordExplanation, WordUsageExample};
+use super::html_dom::{select_all, text_of};
+use crate::scraper::{ClassDefinition, Label, WordContext, WordExplanation, WordUsageExample};
 
 pub fn definition_of(part_of_speech: ElementRef) -> ClassDefinition {
     let senses = child_elements(part_of_speech)
@@ -52,11 +53,23 @@ fn sub_senses(sense: ElementRef) -> Option<Vec<ElementRef>> {
 }
 
 fn meaning_of(sense: ElementRef) -> WordExplanation {
-    WordExplanation::new(explanation_of(sense), examples_of(sense))
+    let mut meaning = WordExplanation::new(explanation_of(sense), examples_of(sense));
+    meaning.labels = labels_of(sense);
+    meaning
+}
+
+fn labels_of(sense: ElementRef) -> Vec<Label> {
+    child_elements(sense)
+        .filter(|child| has_class(*child, "usage-label-sense"))
+        .flat_map(|label| select_all(label, "span.ib-content"))
+        .flat_map(|content| text_of(content).split(',').map(|part| part.trim().to_owned()).collect::<Vec<_>>())
+        .filter(|text| !text.is_empty())
+        .map(|text| Label { kind: "usage".to_owned(), text })
+        .collect()
 }
 
 fn is_not_definition_text(element: ElementRef) -> bool {
-    matches!(element.value().name(), "ul" | "ol" | "dl" | "sup") || has_class(element, "defdate")
+    matches!(element.value().name(), "ul" | "ol" | "dl" | "sup") || has_class(element, "defdate") || has_class(element, "usage-label-sense")
 }
 
 fn explanation_of(sense: ElementRef) -> String {

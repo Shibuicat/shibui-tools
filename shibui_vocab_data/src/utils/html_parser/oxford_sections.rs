@@ -81,26 +81,6 @@ pub fn sections_of(entry: ElementRef) -> Vec<Section> {
 }
 
 fn levels(entry: ElementRef, book: &mut SectionBook) {
-    let headword_levels = select_first(entry, "div.webtop")
-        .into_iter()
-        .flat_map(child_elements)
-        .filter(|part| has_class(*part, "symbols"))
-        .flat_map(|symbols| select_all(symbols, "span"))
-        .filter_map(|symbol| {
-            symbol
-                .value()
-                .classes()
-                .find_map(|class| class.strip_prefix("ox3ksym_").or_else(|| class.strip_prefix("ox5ksym_")))
-                .map(str::to_uppercase)
-        })
-        .map(|level| plain(format!("Headword: {level}")));
-    let sense_levels = select_all(entry, "li.sense")
-        .into_iter()
-        .filter(outside_idioms)
-        .filter_map(|sense| Some((sense.value().attr("sensenum")?, sense.value().attr("cefr")?)))
-        .map(|(number, level)| plain(format!("Sense {number}: {}", level.to_uppercase())));
-    book.add("level", "CEFR level", headword_levels.chain(sense_levels).collect());
-
     let lists = select_all(entry, "div.symbols a")
         .into_iter()
         .filter_map(|anchor| anchor.value().attr("href"))
@@ -181,7 +161,7 @@ fn boxes(entry: ElementRef, book: &mut SectionBook) {
     select_all(entry, "span.unbox[unbox]").into_iter().for_each(|unbox| {
         let kind = unbox.value().attr("unbox").unwrap_or_default();
         match kind {
-            "verbforms" => book.add("verb-form", "Verb Forms", verb_forms(unbox)),
+            "verbforms" => {}
             "wordorigin" => book.add("etymology", "Word Origin", paragraphs(unbox)),
             "snippet" | "colloc" => book.add("collocation", "Collocations", collocations(unbox)),
             "extra_examples" => book.add("extra-example", "Extra Examples", extra_examples(unbox)),
@@ -203,17 +183,6 @@ fn box_title(unbox: ElementRef, fallback: &str) -> String {
 
 fn list_items(unbox: ElementRef) -> Vec<SectionItem> {
     select_all(unbox, "li").into_iter().map(|item| plain(text_of(item))).collect()
-}
-
-fn verb_forms(unbox: ElementRef) -> Vec<SectionItem> {
-    select_all(unbox, "td.verb_form")
-        .into_iter()
-        .map(|cell| {
-            let prefix = select_first(cell, "span.vf_prefix").map(text_of).unwrap_or_default();
-            let form = text_without(cell, &|part| has_class(part, "vf_prefix"));
-            plain(format!("{prefix}: {form}"))
-        })
-        .collect()
 }
 
 fn paragraphs(unbox: ElementRef) -> Vec<SectionItem> {

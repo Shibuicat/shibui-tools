@@ -71,14 +71,16 @@ fn each_sense_becomes_a_context_with_its_definition_and_examples() {
 }
 
 #[test]
-fn usage_patterns_grammar_and_labels_describe_the_sense() {
+fn usage_patterns_grammar_and_labels_are_typed_fields_of_the_meaning() {
     let definition = parse_fixture("bear");
 
-    let described = contexts(&definition)
+    let context = contexts(&definition)
         .iter()
-        .filter_map(|context| context["description"].as_str())
-        .collect::<Vec<_>>();
-    assert!(described.contains(&"support weight [transitive] bear something"));
+        .find(|context| context["description"] == "support weight")
+        .expect("the support-weight group");
+    let meaning = &context["meanings"][0];
+    assert_eq!(meaning["grammar"], "transitive");
+    assert_eq!(meaning["pattern"], "bear something");
 }
 
 #[test]
@@ -98,11 +100,16 @@ fn a_sense_without_notes_has_no_description() {
 }
 
 #[test]
-fn the_verb_forms_table_becomes_a_section() {
+fn the_verb_forms_table_becomes_labelled_forms_with_pronunciations() {
     let definition = parse_fixture("abandon");
 
+    let forms = definition["classes"][0]["forms"].as_array().unwrap();
+    let described = forms
+        .iter()
+        .map(|form| format!("{}: {}", form["label"].as_str().unwrap(), form["text"].as_str().unwrap()))
+        .collect::<Vec<_>>();
     assert_eq!(
-        item_texts(section(&definition, "verb-form")),
+        described,
         vec![
             "present simple I / you / we / they: abandon",
             "he / she / it: abandons",
@@ -111,14 +118,16 @@ fn the_verb_forms_table_becomes_a_section() {
             "-ing form: abandoning",
         ]
     );
+    assert_eq!(forms[1]["pronunciations"][0]["region"], "UK");
+    assert!(forms[1]["pronunciations"][0]["link"].as_str().unwrap().ends_with(".mp3"));
 }
 
 #[test]
 fn levels_word_lists_and_topics_are_kept() {
     let definition = parse_fixture("abandon");
 
-    assert_eq!(item_texts(section(&definition, "level"))[0], "Headword: B2");
-    assert!(item_texts(section(&definition, "level")).contains(&"Sense 2: B2".to_owned()));
+    assert_eq!(definition["classes"][0]["level"], "B2");
+    assert_eq!(contexts(&definition)[1]["meanings"][0]["level"], "B2");
     assert_eq!(item_texts(section(&definition, "word-list")), vec!["Oxford 3000"]);
     let topic = &section(&definition, "topic")["items"][0];
     assert_eq!(topic["text"], "Difficulty and failure (b2)");
@@ -129,8 +138,8 @@ fn levels_word_lists_and_topics_are_kept() {
 fn the_headword_level_is_not_mixed_with_sense_levels() {
     let definition = parse_fixture("cold");
 
-    let levels = item_texts(section(&definition, "level"));
-    assert_eq!(levels.iter().filter(|level| level.starts_with("Headword")).count(), 1);
+    assert!(definition["classes"][0]["level"].is_string());
+    assert!(definition["sections"].as_array().unwrap().iter().all(|section| section["key"] != "level"));
 }
 
 #[test]
@@ -262,7 +271,7 @@ fn the_homograph_number_is_not_part_of_the_word() {
 #[test]
 fn oxford_5000_levels_and_opal_lists_are_kept() {
     let accomplish = parse_fixture("accomplish");
-    assert!(item_texts(section(&accomplish, "level"))[0].starts_with("Headword: "));
+    assert!(accomplish["classes"][0]["level"].is_string());
     assert_eq!(item_texts(section(&accomplish, "word-list")), vec!["Oxford 5000"]);
 
     let although = parse_fixture("although");

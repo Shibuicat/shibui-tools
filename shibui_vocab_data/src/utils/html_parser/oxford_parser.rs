@@ -1,13 +1,13 @@
 use anyhow::{anyhow, bail};
 use scraper::Html;
 
-use super::html_dom::{child_elements, has_class, select_first, text_of, text_without};
+use super::html_dom::{child_elements, has_class, select_all, select_first, text_of, text_without};
 use super::oxford_fragment::clean_entry;
 use super::oxford_pronunciation::pronounces_of;
 use super::oxford_sections::sections_of;
 use super::oxford_senses::definition_of;
 use super::{HtmlParser, WordNotFoundError};
-use crate::scraper::{Class, WordClass, WordDefinition};
+use crate::scraper::{Class, WordClass, WordDefinition, WordForm};
 
 const NOT_FOUND_TITLE: &str = "Did you spell it correctly";
 const UNKNOWN_CLASS: &str = "unknown";
@@ -31,17 +31,20 @@ impl HtmlParser for OxfordHtmlParser {
             .find(|child| has_class(*child, "pos"))
             .map(text_of)
             .unwrap_or_else(|| UNKNOWN_CLASS.to_owned());
+        let mut class = WordClass::new(
+            Class::from(class_name.to_lowercase().as_str()),
+            vec![definition_of(entry)],
+            pronounces_of(webtop),
+        );
+        class.level = headword_level(webtop);
+        class.forms = forms_of(entry);
         let definition = WordDefinition {
             extracted_html: Some(clean_entry(content)),
             ..WordDefinition::new(
                 select_first(webtop, "h1.headword")
                     .map(|headword| text_without(headword, &|part| has_class(part, "hm")))
                     .unwrap_or_default(),
-                vec![WordClass::new(
-                    Class::from(class_name.to_lowercase().as_str()),
-                    vec![definition_of(entry)],
-                    pronounces_of(webtop),
-                )],
+                vec![class],
                 sections_of(entry),
             )
         };
@@ -50,6 +53,35 @@ impl HtmlParser for OxfordHtmlParser {
         }
         Ok(definition)
     }
+}
+
+fn headword_level(webtop: scraper::ElementRef) -> Option<String> {
+    child_elements(webtop)
+        .filter(|part| has_class(*part, "symbols"))
+        .flat_map(|symbols| select_all(symbols, "span"))
+        .find_map(|symbol| {
+            symbol
+                .value()
+                .classes()
+                .find_map(|class| class.strip_prefix("ox3ksym_").or_else(|| class.strip_prefix("ox5ksym_")))
+                .map(str::to_uppercase)
+        })
+}
+
+fn forms_of(entry: scraper::ElementRef) -> Vec<WordForm> {
+    select_all(entry, "tr.verb_form")
+        .into_iter()
+        .filter_map(|row| {
+            let cell = select_first(row, "td.verb_form")?;
+            let text = text_without(cell, &|part| has_class(part, "vf_prefix"));
+            (!text.is_empty()).then(|| WordForm {
+                label: select_first(cell, "span.vf_prefix").map(text_of).filter(|label| !label.is_empty()),
+                text,
+                audio: None,
+                pronunciations: select_first(row, "td.verb_phons").map(pronounces_of).unwrap_or_default(),
+            })
+        })
+        .collect()
 }
 
 fn missing_content(document: &Html) -> anyhow::Error {
