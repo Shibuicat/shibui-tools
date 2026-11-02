@@ -57,6 +57,7 @@ fn explanation_of(sense: ElementRef) -> Option<String> {
         .find(|child| has_class(*child, "def"))
         .or_else(|| child_elements(sense).find(|child| has_class(*child, "xr")))
         .map(text_of)
+        .map(|text| text.trim_start_matches(|c: char| matches!(c, '.' | ':' | ';' | ',') || c.is_whitespace()).to_owned())
         .filter(|text| !text.is_empty())
 }
 

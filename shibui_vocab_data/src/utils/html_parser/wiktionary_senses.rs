@@ -20,18 +20,39 @@ fn contexts_of(senses: &[ElementRef]) -> Vec<WordContext> {
     let mut contexts = Vec::new();
     let mut plain = Vec::new();
 
-    senses.iter().for_each(|sense| match sub_senses(*sense) {
+    senses.iter().filter(|sense| has_content(**sense)).for_each(|sense| match sub_senses(*sense) {
         Some(sub_senses) => {
             flush(&mut plain, &mut contexts);
+            let description = Some(explanation_of(*sense)).filter(|text| !text.is_empty());
+            let inherited = if description.is_none() { labels_of(*sense) } else { Vec::new() };
             contexts.push(WordContext {
-                description: Some(explanation_of(*sense)).filter(|text| !text.is_empty()),
-                meanings: sub_senses.into_iter().map(meaning_of).collect(),
+                description,
+                meanings: sub_senses.into_iter().flat_map(|sub| meanings_of(sub, &inherited)).collect(),
             });
         }
-        None => plain.push(meaning_of(*sense)),
+        None => plain.extend(meanings_of(*sense, &[])),
     });
     flush(&mut plain, &mut contexts);
     contexts
+}
+
+fn meanings_of(sense: ElementRef, inherited: &[Label]) -> Vec<WordExplanation> {
+    if !has_content(sense) {
+        return Vec::new();
+    }
+    let labels = inherited.iter().cloned().chain(labels_of(sense)).collect::<Vec<_>>();
+    let nested = sub_senses(sense).unwrap_or_default();
+    if explanation_of(sense).is_empty() {
+        return nested.into_iter().flat_map(|sub| meanings_of(sub, &labels)).collect();
+    }
+    let mut meaning = WordExplanation::new(explanation_of(sense), examples_of(sense));
+    meaning.labels = labels;
+    meaning.sub_meanings = nested.into_iter().flat_map(|sub| meanings_of(sub, &[])).collect();
+    vec![meaning]
+}
+
+fn has_content(sense: ElementRef) -> bool {
+    !explanation_of(sense).is_empty() || sub_senses(sense).is_some()
 }
 
 fn flush(plain: &mut Vec<WordExplanation>, contexts: &mut Vec<WordContext>) {
@@ -52,12 +73,6 @@ fn sub_senses(sense: ElementRef) -> Option<Vec<ElementRef>> {
     (!nested.is_empty()).then_some(nested)
 }
 
-fn meaning_of(sense: ElementRef) -> WordExplanation {
-    let mut meaning = WordExplanation::new(explanation_of(sense), examples_of(sense));
-    meaning.labels = labels_of(sense);
-    meaning
-}
-
 fn labels_of(sense: ElementRef) -> Vec<Label> {
     child_elements(sense)
         .filter(|child| has_class(*child, "usage-label-sense"))
@@ -74,6 +89,8 @@ fn is_not_definition_text(element: ElementRef) -> bool {
 
 fn explanation_of(sense: ElementRef) -> String {
     text_without(sense, &is_not_definition_text)
+        .trim_start_matches(|c: char| c == ':' || c.is_whitespace())
+        .to_owned()
 }
 
 fn examples_of(sense: ElementRef) -> Vec<WordUsageExample> {

@@ -276,3 +276,18 @@ fn the_kept_fragment_parses_to_the_same_definition() {
 
     assert_eq!(serde_json::to_value(&first).unwrap(), serde_json::to_value(&again).unwrap());
 }
+
+#[test]
+fn empty_list_items_and_the_colon_after_a_usage_label_do_not_reach_the_meanings() {
+    let html = r#"<html><body><section><h2 id="English">English</h2><section><h3 id="Noun">Noun</h3>
+        <p><span class="headword-line"><strong class="headword">act</strong></span></p>
+        <ol><li class="mw-empty-elt"></li>
+        <li><span class="usage-label-sense"><span class="ib-content">transitive</span></span> : To take action.</li></ol>
+        </section></section></body></html>"#;
+
+    let definition = serde_json::to_value(parse(html).unwrap()).unwrap();
+
+    let meanings = definition["classes"][0]["definitions"][0]["contexts"][0]["meanings"].as_array().unwrap();
+    assert_eq!(meanings.len(), 1);
+    assert_eq!(meanings[0]["explanation"], "To take action.");
+}

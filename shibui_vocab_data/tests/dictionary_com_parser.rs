@@ -112,3 +112,20 @@ fn a_page_without_entries_and_another_title_is_a_layout_change() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_none());
 }
+
+#[test]
+fn italic_words_inside_a_definition_stay_in_its_text_and_only_leading_italics_are_labels() {
+    let html = r#"<html><body><section class="sec-item-entry-group" id="id-sec-entry-group-dcom">
+        <div class="box-item-entry"><h1 class="hdr-headword">cross</h1>
+        <div class="box-posb-content"><div class="box-posb"><div class="box-pos-label"><h2>noun</h2></div>
+        <ol class="list-definition"><li class="item-definition">
+        <p class="txt-variant-label-short"><em>Law.</em> a line of (<em>crosscut</em>) work.</p></li></ol>
+        </div></div></div></section></body></html>"#;
+
+    let definition = serde_json::to_value(parse(html).unwrap()).unwrap();
+
+    let meaning = &definition["classes"][0]["definitions"][0]["contexts"][0]["meanings"][0];
+    assert_eq!(meaning["explanation"], "a line of (crosscut) work.");
+    assert_eq!(meaning["labels"][0]["text"], "Law");
+    assert_eq!(meaning["labels"].as_array().unwrap().len(), 1);
+}

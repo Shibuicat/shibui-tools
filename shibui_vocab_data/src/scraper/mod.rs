@@ -228,7 +228,7 @@ impl WordExplanation {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Label {
     pub kind: String,
     pub text: String,

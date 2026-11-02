@@ -52,16 +52,24 @@ fn label_and_text(item: ElementRef) -> (Vec<Label>, String) {
         return (Vec::new(), String::new());
     };
     let labels = child_elements(paragraph)
-        .filter(|child| child.value().name() == "em")
+        .filter(|child| is_leading_label(paragraph, *child))
         .map(text_of)
         .map(|text| text.trim_end_matches('.').trim().to_owned())
         .filter(|text| !text.is_empty())
         .map(|text| Label { kind: "domain".to_owned(), text })
         .collect();
-    let text = text_without(paragraph, &|part| {
-        part.value().name() == "em" && part.parent().and_then(ElementRef::wrap) == Some(paragraph)
-    });
+    let text = text_without(paragraph, &|part| is_leading_label(paragraph, part));
     (labels, text)
+}
+
+fn is_leading_label(paragraph: ElementRef, element: ElementRef) -> bool {
+    element.value().name() == "em"
+        && element.parent().and_then(ElementRef::wrap) == Some(paragraph)
+        && element.prev_siblings().all(|sibling| match sibling.value() {
+            scraper::Node::Text(text) => text.trim().is_empty(),
+            scraper::Node::Element(_) => ElementRef::wrap(sibling).is_some_and(|previous| previous.value().name() == "em"),
+            _ => true,
+        })
 }
 
 fn examples_of(item: ElementRef) -> Vec<WordUsageExample> {
