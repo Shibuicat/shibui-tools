@@ -159,3 +159,53 @@ impl HttpRequestMaker for PlainHttpRequestMaker {
         }
     }
 }
+
+#[derive(Clone)]
+pub struct ChallengeHttpRequestMaker {
+    keeper: Option<SharedKeeper>,
+}
+
+impl ChallengeHttpRequestMaker {
+    pub fn new(warm_up_url: &str) -> Self {
+        let keeper = std::env::var("FLARESOLVERR_URL").ok().map(|url| {
+            Arc::new(Mutex::new(SessionKeeper::new(FlareSolverrClient::new(&url), warm_up_url)))
+        });
+        Self { keeper }
+    }
+
+    pub async fn start_session(&self) {
+        if let Some(keeper) = &self.keeper {
+            keeper.lock().await.start().await;
+        }
+    }
+
+    pub async fn recycle_session(&self) {
+        if let Some(keeper) = &self.keeper {
+            keeper.lock().await.recycle().await;
+        }
+    }
+
+    pub async fn release_session(&self) {
+        if let Some(keeper) = &self.keeper {
+            keeper.lock().await.release().await;
+        }
+    }
+}
+
+impl HttpRequestMaker for ChallengeHttpRequestMaker {
+    async fn get(&self, url: &str) -> Result<String, FetchError> {
+        let keeper = self
+            .keeper
+            .as_ref()
+            .ok_or_else(|| FetchError::Other(anyhow::anyhow!("FLARESOLVERR_URL is not set")))?;
+        let solution = keeper.lock().await.get(url).await?;
+        println!("GET {url} (via FlareSolverr) -> status {} final_url {}", solution.status, solution.url);
+        if solution.status == 404 {
+            return Err(FetchError::NotFound(format!("Endpoint {url} answered 404")));
+        }
+        if solution.response.contains("Just a moment...") {
+            return Err(FetchError::Other(anyhow::anyhow!("Endpoint {url} returned a Cloudflare challenge page")));
+        }
+        Ok(solution.response)
+    }
+}

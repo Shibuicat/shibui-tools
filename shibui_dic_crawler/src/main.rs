@@ -5,7 +5,8 @@ use std::sync::Arc;
 use axum::{routing::get, Router};
 use shibui_vocab_data::lookup_queue::{LookupBackend, LookupSettings, QueuedWordLookup, WordLookup};
 use shibui_vocab_data::scraper::page_scraper::PageScraper;
-use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, OxfordScraper, WiktionaryScraper, WordDefinition};
+use shibui_vocab_data::scraper::{CambridgeDictionaryScraper, MerriamWebsterScraper, OxfordScraper, WiktionaryScraper, WordDefinition};
+use shibui_vocab_data::utils::http_request::ChallengeHttpRequestMaker;
 use shibui_vocab_data::utils::html_parser::HtmlParser;
 use shibui_vocab_data::utils::http_request::HttpRequestMaker;
 mod routes;
@@ -31,11 +32,18 @@ async fn main() {
     println!("Storing fetched Oxford HTML under {oxford_storage_dir}");
     let oxford = Arc::new(PageFetcher::new(OxfordScraper::new(oxford_storage_dir)));
 
+    let merriam_webster_storage_dir = std::env::var("MERRIAM_WEBSTER_HTML_STORAGE_DIR")
+        .unwrap_or_else(|_| "./html_storage_merriam_webster".to_string());
+    println!("Storing fetched Merriam-Webster HTML under {merriam_webster_storage_dir}");
+    let merriam_webster = Arc::new(SessionPageFetcher::new(MerriamWebsterScraper::new(merriam_webster_storage_dir)));
+    merriam_webster.start_session().await;
+
     let settings = LookupSettings::from_env();
     let lookups: HashMap<String, Box<dyn WordLookup>> = HashMap::from([
         (routes::cambridge_dic::DEFAULT_SOURCE.to_owned(), Box::new(QueuedWordLookup::start(fetcher, settings)) as Box<dyn WordLookup>),
         ("wiktionary".to_owned(), Box::new(QueuedWordLookup::start(wiktionary, settings)) as Box<dyn WordLookup>),
         ("oxford".to_owned(), Box::new(QueuedWordLookup::start(oxford, settings)) as Box<dyn WordLookup>),
+        ("merriam-webster".to_owned(), Box::new(QueuedWordLookup::start(merriam_webster, settings)) as Box<dyn WordLookup>),
     ]);
     let shared_state = Arc::new(AppState { lookups });
 
@@ -81,6 +89,37 @@ where
 
     fn release_session(&self) -> impl Future<Output = ()> + Send {
         async {}
+    }
+}
+
+pub struct SessionPageFetcher<P> {
+    scraper: PageScraper<ChallengeHttpRequestMaker, P>,
+}
+
+impl<P: HtmlParser<Output = WordDefinition>> SessionPageFetcher<P> {
+    pub fn new(scraper: PageScraper<ChallengeHttpRequestMaker, P>) -> Self {
+        Self { scraper }
+    }
+
+    pub async fn start_session(&self) {
+        self.scraper.request_maker().start_session().await;
+    }
+}
+
+impl<P> LookupBackend for SessionPageFetcher<P>
+where
+    P: HtmlParser<Output = WordDefinition> + Send + Sync + 'static,
+{
+    fn fetch(&self, word: &str) -> impl Future<Output = anyhow::Result<Option<WordDefinition>>> + Send {
+        self.scraper.fetch(word)
+    }
+
+    fn rotate_session(&self) -> impl Future<Output = ()> + Send {
+        self.scraper.request_maker().recycle_session()
+    }
+
+    fn release_session(&self) -> impl Future<Output = ()> + Send {
+        self.scraper.request_maker().release_session()
     }
 }
 

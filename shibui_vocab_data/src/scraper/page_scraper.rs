@@ -27,6 +27,10 @@ impl<R: HttpRequestMaker, P: HtmlParser<Output = WordDefinition>> PageScraper<R,
         }
     }
 
+    pub fn request_maker(&self) -> &R {
+        &self.request_maker
+    }
+
     fn cache_path(&self, word: &str) -> PathBuf {
         self.storage_dir.join(format!("{}.html", word.to_lowercase()))
     }
