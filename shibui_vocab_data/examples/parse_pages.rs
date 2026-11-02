@@ -1,4 +1,5 @@
 use shibui_vocab_data::utils::html_parser::{
+    cambridge_parser::CambridgeHtmlParser,
     collins_parser::CollinsHtmlParser,
     dictionary_com_parser::DictionaryComHtmlParser,
     merriam_webster_parser::MerriamWebsterHtmlParser, oxford_parser::OxfordHtmlParser,
@@ -11,6 +12,7 @@ fn parse(source: &str, html: &str) -> anyhow::Result<WordDefinition> {
         "merriam-webster" => MerriamWebsterHtmlParser.parse(html),
         "dictionary-com" => DictionaryComHtmlParser.parse(html),
         "collins" => CollinsHtmlParser.parse(html),
+        "cambridge" => CambridgeHtmlParser.parse(html),
         "oxford" => OxfordHtmlParser.parse(html),
         "wiktionary" => WiktionaryHtmlParser.parse(html),
         other => anyhow::bail!("unknown source {other}"),

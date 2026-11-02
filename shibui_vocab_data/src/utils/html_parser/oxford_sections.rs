@@ -3,7 +3,7 @@ use scraper::ElementRef;
 use super::html_dom::{
     child_elements, has_ancestor_class, has_class, path_of, select_all, select_first, text_of, text_without,
 };
-use crate::scraper::{Section, SectionItem};
+use crate::scraper::{Section, SectionItem, WordUsageExample};
 
 const WORD_LISTS: [(&str, &str); 4] = [
     ("list=ox3000", "Oxford 3000"),
@@ -54,7 +54,7 @@ impl SectionBook {
 
 fn extend_unique(into: &mut Vec<SectionItem>, items: Vec<SectionItem>) {
     items.into_iter().filter(|item| !item.text.is_empty()).for_each(|item| {
-        if !into.iter().any(|existing| existing.text == item.text) {
+        if !into.iter().any(|existing| existing.text == item.text && existing.description == item.description) {
             into.push(item);
         }
     });
@@ -219,9 +219,21 @@ fn idioms(entry: ElementRef, book: &mut SectionBook) {
         .into_iter()
         .flat_map(|idiom| {
             let phrase = select_first(idiom, "span.idm").map(text_of).unwrap_or_default();
-            select_all(idiom, "span.def")
+            select_all(idiom, "li.sense")
                 .into_iter()
-                .map(|definition| plain(format!("{phrase}: {}", text_of(definition))))
+                .filter_map(|sense| {
+                    let definition = select_first(sense, "span.def").map(text_of)?;
+                    Some(SectionItem {
+                        description: Some(definition),
+                        examples: select_all(sense, "span.x")
+                            .into_iter()
+                            .map(|example| text_without(example, &|part| has_class(part, "gloss")))
+                            .filter(|text| !text.is_empty())
+                            .map(WordUsageExample::plain)
+                            .collect(),
+                        ..SectionItem::new(phrase.clone(), None)
+                    })
+                })
                 .collect::<Vec<_>>()
         });
     book.add("idiom", "Idioms", items.collect());

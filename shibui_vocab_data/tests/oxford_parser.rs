@@ -180,8 +180,11 @@ fn inflections_variants_and_idioms_are_kept() {
         item_texts(section(&parse_fixture("although"), "alternative-form")),
         vec!["US English, informal altho"]
     );
-    let idioms = item_texts(section(&parse_fixture("back"), "idiom"));
-    assert!(idioms[0].starts_with("at/in the back of your mind: if a thought"));
+    let back = parse_fixture("back");
+    let idiom = &section(&back, "idiom")["items"][0];
+    assert_eq!(idiom["text"], "at/in the back of your mind");
+    assert!(idiom["description"].as_str().unwrap().starts_with("if a thought"));
+    assert_eq!(idiom["examples"].as_array().unwrap().len(), 2);
 }
 
 #[test]

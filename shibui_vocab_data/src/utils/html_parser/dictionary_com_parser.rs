@@ -59,7 +59,7 @@ fn group_of(section: ElementRef) -> Group {
         label: if label.is_empty() { key.clone() } else { label },
         kind: kind.to_owned(),
         key,
-        attribution: None,
+        attribution: select_first(section, "cite").map(text_of).filter(|text| !text.is_empty()),
         frequency: None,
         pronunciations: Vec::new(),
         classes: select_all(section, "div.box-item-entry")

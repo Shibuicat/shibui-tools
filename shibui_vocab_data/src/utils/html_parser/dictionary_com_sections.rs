@@ -4,16 +4,14 @@ use super::html_dom::{select_all, select_first, text_of};
 use crate::scraper::{LinkKind, Section, SectionItem, WordUsageExample};
 
 pub fn sections_of(root: ElementRef) -> Vec<Section> {
-    [
-        etymology(root),
-        paragraphs(root, "usage-note", "Usage", "section#id-sec-notes-usage p.txt-item-notes"),
-        paragraphs(root, "synonym-study", "Synonym Usage", "section#id-sec-notes-synonym-study p.txt-item-notes"),
-        paragraphs(root, "explanation", "Explanation", "section#id-sec-explanation p.txt-item-notes"),
+    std::iter::once(etymology(root))
+        .chain(notes(root))
+        .chain([
+        paragraphs(root, "explanation", "Explanation", "section#id-sec-explanation div.box-explanation-text p"),
         word_forms(root),
         links(root, "related", "Related Words", "section#id-sec-related-words a.lk-related-word"),
         examples(root),
-    ]
-    .into_iter()
+    ])
     .flatten()
     .collect()
 }
@@ -41,6 +39,27 @@ fn etymology(root: ElementRef) -> Option<Section> {
         .map(|text| SectionItem::new(text, None))
         .collect();
     section("etymology", "Etymology", items)
+}
+
+fn notes(root: ElementRef) -> Vec<Option<Section>> {
+    select_all(root, "section.sec-list-notes")
+        .into_iter()
+        .map(|block| {
+            let label = select_first(block, "h2").map(text_of).unwrap_or_else(|| "Notes".to_owned());
+            let items = select_all(block, "p.txt-item-notes, li")
+                .into_iter()
+                .map(text_of)
+                .filter(|text| !text.is_empty())
+                .map(|text| SectionItem::new(text, None))
+                .collect();
+            let key = block
+                .value()
+                .attr("id")
+                .map(|id| id.trim_start_matches("id-sec-").to_owned())
+                .unwrap_or_else(|| "notes".to_owned());
+            section(&key, &label, items)
+        })
+        .collect()
 }
 
 fn paragraphs(root: ElementRef, key: &str, label: &str, css: &str) -> Option<Section> {
@@ -85,11 +104,16 @@ fn examples(root: ElementRef) -> Option<Section> {
         .filter_map(|block| {
             let text = select_first(block, "p.txt-example").map(text_of).filter(|text| !text.is_empty())?;
             let source = select_first(block, "cite").map(text_of).filter(|source| !source.is_empty());
+            let date = select_first(block, "p.txt-source")
+                .map(|line| text_of(line))
+                .and_then(|line| line.rsplit_once('●').map(|(_, date)| date.trim().to_owned()))
+                .filter(|date| !date.is_empty());
             Some(SectionItem {
                 examples: vec![WordUsageExample {
                     text: text.clone(),
                     source: source.map(|title| crate::scraper::ExampleSource {
                         title: Some(title),
+                        date,
                         link: select_first(block, "a.lk-ex-source").and_then(|a| a.value().attr("href")).map(str::to_owned),
                         ..Default::default()
                     }),
