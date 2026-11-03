@@ -141,7 +141,10 @@ fn pronunciations_of(entry: ElementRef) -> Vec<WordPronounce> {
 fn missing_entries(root: ElementRef) -> anyhow::Error {
     let title = select_first(root, "title").map(text_of).unwrap_or_default().to_lowercase();
     let names_a_word = select_first(root, "h1.hdr-headword").is_some();
-    if title.contains("not found") || title.contains("404") || names_a_word {
+    let is_encyclopedia_page = select_first(root, "link[rel=canonical]")
+        .and_then(|link| link.value().attr("href"))
+        .is_some_and(|href| href.contains("/culture/"));
+    if title.contains("not found") || title.contains("404") || names_a_word || is_encyclopedia_page {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

@@ -147,3 +147,12 @@ fn a_page_with_no_headword_and_no_entry_blocks_is_a_layout_failure() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_none());
 }
+
+#[test]
+fn a_word_that_redirects_to_an_encyclopedia_article_is_not_found() {
+    let html = r#"<html><head><title>TikTok | Tech &amp; Science | Dictionary.com</title><link rel="canonical" href="https://www.dictionary.com/culture/tech-science/tiktok"/></head><body><h1>TikTok</h1></body></html>"#;
+
+    let error = DictionaryComHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
