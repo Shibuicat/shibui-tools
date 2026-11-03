@@ -100,3 +100,12 @@ fn an_inflected_form_that_only_points_to_its_base_word_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_partial_matches_page_that_only_lists_other_entries_is_not_found() {
+    let html = r#"<html><head><title>Angeles | Definition &amp; Meaning - Merriam-Webster</title></head><body><div id="left-content"><p class="partial-match-blurb">The following 3 entries include the term angeles.</p><div class="partial-matches"><a href="/dictionary/Los%20Angeles">Los Angeles</a></div></div></body></html>"#;
+
+    let error = MerriamWebsterHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}

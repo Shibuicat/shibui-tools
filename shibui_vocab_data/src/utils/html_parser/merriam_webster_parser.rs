@@ -27,7 +27,7 @@ impl HtmlParser for MerriamWebsterHtmlParser {
             .first()
             .and_then(|entry| select_first(*entry, ".hword"))
             .map(text_of)
-            .ok_or_else(layout_changed)?;
+            .ok_or_else(|| no_entry(content))?;
 
         let definition = WordDefinition {
             extracted_html: Some(clean_entries(root)),
@@ -82,6 +82,14 @@ fn pronunciation_of(link: ElementRef) -> Option<WordPronounce> {
 fn missing_content(root: ElementRef) -> anyhow::Error {
     let title = select_first(root, "title").map(text_of).unwrap_or_default();
     if title.contains(NOT_FOUND_TITLE) || select_first(root, "h1.mispelled-word").is_some() {
+        anyhow::Error::new(WordNotFoundError)
+    } else {
+        layout_changed()
+    }
+}
+
+fn no_entry(content: ElementRef) -> anyhow::Error {
+    if select_first(content, "p.partial-match-blurb").is_some() {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()
