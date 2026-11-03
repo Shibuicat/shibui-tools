@@ -60,7 +60,7 @@ impl DefaultHttpRequestMaker {
             )))
         });
         Self {
-            client: reqwest::Client::new(),
+            client: client_with_timeout(REQUEST_TIMEOUT),
             flaresolverr,
         }
     }
@@ -133,7 +133,17 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
 const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project)";
 const CONTACT_VARIABLE: &str = "CRAWLER_CONTACT";
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
+
+pub fn client_with_timeout(timeout: Duration) -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(timeout)
+        .build()
+        .unwrap_or_default()
+}
 
 pub fn user_agent_with(contact_url: Option<&str>) -> String {
     match contact_url.map(str::trim).filter(|url| !url.is_empty()) {
@@ -164,6 +174,8 @@ impl PlainHttpRequestMaker {
         Self {
             client: reqwest::Client::builder()
                 .user_agent(user_agent_with(contact_url))
+                .connect_timeout(CONNECT_TIMEOUT)
+                .timeout(REQUEST_TIMEOUT)
                 .build()
                 .unwrap_or_default(),
         }

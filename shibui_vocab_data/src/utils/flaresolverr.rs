@@ -57,7 +57,7 @@ pub struct FlareSolverrClient {
 impl FlareSolverrClient {
     pub fn new(base_url: &str) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: crate::utils::http_request::client_with_timeout(std::time::Duration::from_secs(120)),
             endpoint: format!("{}/v1", base_url.trim_end_matches('/')),
         }
     }

@@ -65,6 +65,7 @@ impl LookupBackend for FakeBackend {
         match word {
             "missing" => Ok(None),
             "broken" => Err(anyhow::anyhow!("boom")),
+            "stuck" => std::future::pending().await,
             _ => Ok(Some(definition(word))),
         }
     }
@@ -332,4 +333,23 @@ async fn releases_again_after_a_new_lookup_and_another_idle_period() {
     let_tasks_run().await;
 
     assert_eq!(backend.releases.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_fetch_that_never_finishes_is_abandoned_so_a_later_word_is_still_served() {
+    let backend = FakeBackend::open();
+    let lookup = Arc::new(QueuedWordLookup::start(backend.clone(), settings(5, 90, 3600)));
+    let stuck = tokio::spawn({
+        let lookup = Arc::clone(&lookup);
+        async move { lookup.lookup("stuck").await }
+    });
+    let_tasks_run().await;
+
+    tokio::time::advance(Duration::from_secs(91)).await;
+    assert!(matches!(stuck.await.unwrap(), Err(LookupError::TimedOut)));
+    tokio::time::advance(Duration::from_secs(10)).await;
+    let_tasks_run().await;
+    let later = lookup.lookup("fine").await.unwrap().unwrap();
+
+    assert_eq!(later.word, "fine");
 }

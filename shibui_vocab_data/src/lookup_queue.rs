@@ -12,6 +12,7 @@ use crate::scraper::WordDefinition;
 pub const DEFAULT_QUEUE_CAPACITY: usize = 20;
 pub const DEFAULT_LOOKUP_TIMEOUT_SECS: u64 = 90;
 pub const DEFAULT_SESSION_MAX_AGE_SECS: u64 = 86_400;
+pub const ABANDON_GRACE: Duration = Duration::from_secs(5);
 pub const DEFAULT_SESSION_IDLE_SECS: u64 = 600;
 
 #[derive(Debug)]
@@ -142,7 +143,7 @@ async fn run_worker<B: LookupBackend>(backend: Arc<B>, mut inbox: mpsc::Receiver
         tokio::select! {
             job = inbox.recv() => match job {
                 Some(job) => {
-                    serve(backend.as_ref(), job).await;
+                    serve(backend.as_ref(), job, settings.timeout + ABANDON_GRACE).await;
                     release_at = Some(Instant::now() + settings.session_idle_timeout);
                 }
                 None => break,
@@ -159,10 +160,17 @@ async fn run_worker<B: LookupBackend>(backend: Arc<B>, mut inbox: mpsc::Receiver
     }
 }
 
-async fn serve<B: LookupBackend>(backend: &B, job: Job) {
+async fn serve<B: LookupBackend>(backend: &B, job: Job, deadline: Duration) {
     if job.reply.is_closed() {
         return;
     }
-    let result = backend.fetch(&job.word).await;
+    let result = match timeout(deadline, backend.fetch(&job.word)).await {
+        Ok(result) => result,
+        Err(_) => Err(anyhow::anyhow!(
+            "the fetch of '{}' was abandoned after {} s",
+            job.word,
+            deadline.as_secs()
+        )),
+    };
     let _ = job.reply.send(result);
 }
