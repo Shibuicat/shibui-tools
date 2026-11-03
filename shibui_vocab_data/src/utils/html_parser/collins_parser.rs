@@ -26,7 +26,7 @@ impl HtmlParser for CollinsHtmlParser {
             bail!(missing_blocks(html_content));
         }
 
-        let word = select_first(blocks[0], "h2.h2_entry span.orth").map(text_of).ok_or_else(layout_changed)?;
+        let word = select_first(blocks[0], "h2.h2_entry span.orth").map(text_of).ok_or_else(|| missing_headword(root))?;
         let mut parsed = unique_keys(blocks.iter().map(|block| parsed_block(*block)).filter(Parsed::has_content).collect());
         if parsed.is_empty() {
             bail!(layout_changed());
@@ -234,6 +234,14 @@ fn audio_of(sound: ElementRef) -> Option<String> {
 
 fn missing_blocks(html: &str) -> anyhow::Error {
     if html.contains(NOT_FOUND_TEXT) {
+        anyhow::Error::new(WordNotFoundError)
+    } else {
+        layout_changed()
+    }
+}
+
+fn missing_headword(root: ElementRef) -> anyhow::Error {
+    if select_first(root, "h2.h2_entry").is_none() {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

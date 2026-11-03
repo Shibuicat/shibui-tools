@@ -107,3 +107,12 @@ fn a_page_without_entries_and_without_the_text_is_a_layout_change() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_none());
 }
+
+#[test]
+fn a_redirect_to_a_compound_phrase_page_without_an_entry_headword_is_not_found() {
+    let html = r#"<html><head><title>ACADEMIC RESEARCHER definition and meaning | Collins English Dictionary</title></head><body><div class="page"><div class="dictionary Collocations_EN dictentry"><h1 class="entry_title">Example sentences academic researcher</h1></div><div class="dictionary Cob_Adv_Brit dictentry"><h2 class="entry_title"><span class="orth">academic</span></h2></div></div></body></html>"#;
+
+    let error = CollinsHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
