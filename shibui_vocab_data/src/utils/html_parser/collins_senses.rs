@@ -22,7 +22,7 @@ pub fn contexts_of(hom: ElementRef) -> Vec<WordContext> {
         .then(|| meanings_of(hom, &[]))
         .unwrap_or_default();
 
-    child_elements(hom)
+    let own_contexts = child_elements(hom)
         .filter(|child| (has_class(*child, "sense") && !has_class(*child, "re")) || is_cross_reference(*child))
         .flat_map(|sense| meanings_of(sense, &inherited))
         .chain(own_definition)
@@ -32,6 +32,26 @@ pub fn contexts_of(hom: ElementRef) -> Vec<WordContext> {
             meaning
         })
         .map(|meaning| WordContext { description: None, meanings: vec![meaning] })
+        .collect::<Vec<_>>();
+
+    if own_contexts.is_empty() {
+        phrase_contexts(hom, &inherited)
+    } else {
+        own_contexts
+    }
+}
+
+fn phrase_contexts(hom: ElementRef, inherited: &[Label]) -> Vec<WordContext> {
+    child_elements(hom)
+        .filter(|child| has_class(*child, "re") && has_class(*child, "type-idm"))
+        .map(|phrase| WordContext {
+            description: select_first(phrase, "span.form.orth").map(text_of).filter(|text| !text.is_empty()),
+            meanings: child_elements(phrase)
+                .filter(|child| has_class(*child, "sense"))
+                .flat_map(|sense| meanings_of(sense, inherited))
+                .collect(),
+        })
+        .filter(|context| !context.meanings.is_empty())
         .collect()
 }
 

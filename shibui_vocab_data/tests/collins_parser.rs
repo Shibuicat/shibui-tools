@@ -138,3 +138,15 @@ fn a_page_whose_entries_sit_in_one_element_that_is_both_dictionaries_and_diction
     assert!(fragment.len() > 1000);
     assert_eq!(serde_json::to_value(&first).unwrap(), serde_json::to_value(&again).unwrap());
 }
+
+#[test]
+fn an_entry_whose_only_senses_sit_under_a_phrase_form_uses_them_as_its_meanings() {
+    let html = r#"<html><head><title>COLONIES definition and meaning | Collins English Dictionary</title></head><body><div class="dictionaries dictionary Collins_Eng_Dict"><div class="dictentry dictlink"><h2 class="h2_entry"><span class="orth">Colonies</span></h2><div class="content definitions"><div class="hom"><span class="gramGrp pos">plural noun</span><div class="re type-idm"><span class="form type-idm orth">the Colonies</span><div class="sense"><span class="sensenum">1. </span><span class="lbl type-geo"> British</span><div class="def">the subject territories formerly in the British Empire</div></div><div class="sense"><span class="sensenum">2. </span><span class="lbl type-geo"> US</span><div class="def">the 13 states forming the original United States</div></div></div></div><div class="copyright">Collins</div></div></div></div></body></html>"#;
+
+    let definition = serde_json::to_value(CollinsHtmlParser.parse(html).unwrap()).unwrap();
+
+    let contexts = definition["classes"][0]["definitions"][0]["contexts"].as_array().unwrap();
+    assert_eq!(contexts[0]["description"], "the Colonies");
+    assert_eq!(contexts[0]["meanings"].as_array().unwrap().len(), 2);
+    assert_eq!(contexts[0]["meanings"][1]["explanation"], "the 13 states forming the original United States");
+}
