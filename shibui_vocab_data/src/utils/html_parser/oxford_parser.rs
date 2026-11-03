@@ -49,7 +49,8 @@ impl HtmlParser for OxfordHtmlParser {
             )
         };
         if !definition.has_meanings() {
-            bail!(if select_first(document.root_element(), "li.sense").is_some() {
+            let root = document.root_element();
+            bail!(if select_first(root, "li.sense").is_some() || select_first(root, "aside.phrasal_verb_links").is_some() {
                 anyhow::Error::new(WordNotFoundError)
             } else {
                 layout_changed()

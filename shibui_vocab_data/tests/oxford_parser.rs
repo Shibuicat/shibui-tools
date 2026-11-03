@@ -331,3 +331,12 @@ fn an_inflected_form_whose_only_sense_points_to_another_entry_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_headword_that_only_has_phrasal_verbs_is_not_found() {
+    let html = r#"<html><head><title>peter verb</title></head><body><div id="entryContent"><div class="entry"><div class="top-container"><div class="top-g"><div class="webtop"><h1 class="headword">peter</h1><span class="pos">verb</span></div></div></div><aside class="phrasal_verb_links"><ul class="pvrefs"><li><a href="https://www.oxfordlearnersdictionaries.com/definition/english/peter-out"><span class="xh">peter out</span></a></li></ul></aside></div></div></body></html>"#;
+
+    let error = OxfordHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
