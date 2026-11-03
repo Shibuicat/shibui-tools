@@ -11,6 +11,7 @@ use crate::scraper::{Class, Group, Region, WordClass, WordDefinition, WordForm, 
 const GROUP_ID_PREFIX: &str = "id-sec-entry-group-";
 const PRIMARY_GROUP: &str = "dcom";
 const UNKNOWN_CLASS: &str = "unknown";
+const NOT_IN_DICTIONARY_TEXT: &str = "is not in our dictionary";
 
 #[derive(Clone)]
 pub struct DictionaryComHtmlParser;
@@ -144,7 +145,8 @@ fn missing_entries(root: ElementRef) -> anyhow::Error {
     let is_encyclopedia_page = select_first(root, "link[rel=canonical]")
         .and_then(|link| link.value().attr("href"))
         .is_some_and(|href| href.contains("/culture/"));
-    if title.contains("not found") || title.contains("404") || names_a_word || is_encyclopedia_page {
+    let is_machine_guess = text_of(root).contains(NOT_IN_DICTIONARY_TEXT);
+    if title.contains("not found") || title.contains("404") || names_a_word || is_encyclopedia_page || is_machine_guess {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

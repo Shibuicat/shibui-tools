@@ -156,3 +156,12 @@ fn a_word_that_redirects_to_an_encyclopedia_article_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_page_that_only_offers_an_ai_guess_for_an_unknown_word_is_not_found() {
+    let html = r#"<html><head><title>LINKEDIN Definition &amp; Meaning | Dictionary.com</title></head><body><main><p>LinkedIn is not in our dictionary (yet). Here's what it could mean:</p><p>Results generated using artificial intelligence.</p></main></body></html>"#;
+
+    let error = DictionaryComHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
