@@ -142,21 +142,37 @@ fn the_headword_level_is_not_mixed_with_sense_levels() {
     assert!(definition["sections"].as_array().unwrap().iter().all(|section| section["key"] != "level"));
 }
 
+fn relations_named(definition: &serde_json::Value, kind: &str) -> Vec<serde_json::Value> {
+    contexts(definition)
+        .iter()
+        .flat_map(|context| context["meanings"].as_array().unwrap().iter())
+        .flat_map(|meaning| meaning["relations"].as_array().cloned().unwrap_or_default())
+        .filter(|relation| relation["kind"] == kind)
+        .collect()
+}
+
 #[test]
-fn synonym_references_link_to_the_word_without_its_entry_number() {
+fn synonym_references_are_relations_of_their_meaning_linked_without_the_entry_number() {
     let definition = parse_fixture("abandon");
 
-    let synonym = &section(&definition, "synonym")["items"][0];
-    assert_eq!(synonym["text"], "leave");
-    assert_eq!(synonym["link"], "leave");
+    let synonyms = relations_named(&definition, "synonym");
+    assert_eq!(synonyms[0]["terms"][0]["text"], "leave");
+    assert_eq!(synonyms[0]["terms"][0]["link"], "leave");
+    assert!(!has_section(&definition, "synonym"));
 }
 
 #[test]
 fn see_also_references_are_kept_apart_from_synonyms() {
     let definition = parse_fixture("cold");
 
-    assert!(item_texts(section(&definition, "see-also")).contains(&"stone cold".to_owned()));
-    assert!(!has_section(&definition, "synonym"));
+    let see_also = relations_named(&definition, "see-also");
+    let texts = see_also
+        .iter()
+        .flat_map(|relation| relation["terms"].as_array().unwrap().iter())
+        .map(|term| term["text"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(texts.contains(&"stone cold".to_owned()));
+    assert!(relations_named(&definition, "synonym").is_empty());
 }
 
 #[test]

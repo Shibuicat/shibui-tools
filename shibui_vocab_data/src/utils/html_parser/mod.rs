@@ -1,4 +1,6 @@
-mod cambridge_elements;
+mod cambridge_senses;
+mod cambridge_sections;
+mod cambridge_terms;
 mod collins_fragment;
 pub mod collins_parser;
 mod collins_sections;
@@ -23,7 +25,16 @@ mod wiktionary_pronunciation;
 mod wiktionary_senses;
 pub mod wiktionary_parser;
 
-pub use cambridge_elements::WordNotFoundError;
+#[derive(Debug)]
+pub struct WordNotFoundError;
+
+impl std::fmt::Display for WordNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Word doesn't exist")
+    }
+}
+
+impl std::error::Error for WordNotFoundError {}
 
 pub trait HtmlParser {
     type Output;

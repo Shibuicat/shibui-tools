@@ -1,8 +1,9 @@
 use scraper::ElementRef;
 
 use super::html_dom::{child_elements, has_class, text_of};
-use super::html_dom::{select_first, text_without};
-use crate::scraper::{ClassDefinition, Label, WordContext, WordExplanation, WordUsageExample};
+use super::html_dom::{select_all, select_first, text_without};
+use super::oxford_sections::{relation_kind, terms_in};
+use crate::scraper::{ClassDefinition, Label, Relation, WordContext, WordExplanation, WordUsageExample};
 
 pub fn definition_of(entry: ElementRef) -> ClassDefinition {
     ClassDefinition {
@@ -48,6 +49,7 @@ fn context_of(group: Option<String>, sense: ElementRef) -> Option<WordContext> {
     meaning.pattern = text_of_class(&parts, "cf");
     meaning.labels = labels_of(&parts);
     meaning.notes = parts.iter().filter(|part| has_class(**part, "use")).map(|part| text_of(*part)).collect();
+    meaning.relations = relations_of(&parts);
 
     Some(WordContext {
         description: group.filter(|text| !text.is_empty()),
@@ -63,6 +65,18 @@ fn example_of(item: ElementRef) -> Option<WordUsageExample> {
         gloss: select_first(example, "span.gloss").map(text_of),
         ..WordUsageExample::default()
     })
+}
+
+fn relations_of(parts: &[ElementRef]) -> Vec<Relation> {
+    parts
+        .iter()
+        .filter(|part| has_class(**part, "xrefs"))
+        .filter_map(|xrefs| {
+            let prefix = select_first(*xrefs, "span.prefix").map(text_of).unwrap_or_default();
+            let terms = terms_in(*xrefs);
+            (!terms.is_empty()).then(|| Relation { kind: relation_kind(&prefix).0.to_owned(), terms })
+        })
+        .collect()
 }
 
 fn labels_of(parts: &[ElementRef]) -> Vec<Label> {

@@ -3,7 +3,7 @@ use scraper::ElementRef;
 use super::html_dom::{
     child_elements, has_ancestor_class, has_class, path_of, select_all, select_first, text_of, text_without,
 };
-use crate::scraper::{Section, SectionItem, WordUsageExample};
+use crate::scraper::{RelationTerm, Section, SectionItem, WordUsageExample};
 
 const WORD_LISTS: [(&str, &str); 4] = [
     ("list=ox3000", "Oxford 3000"),
@@ -89,16 +89,31 @@ fn levels(entry: ElementRef, book: &mut SectionBook) {
     book.add("word-list", "Word lists", lists.collect());
 }
 
+pub fn relation_kind(prefix: &str) -> (&'static str, &'static str) {
+    match prefix.to_lowercase().as_str() {
+        "synonym" => ("synonym", "Synonyms"),
+        "opposite" => ("antonym", "Antonyms"),
+        _ => ("see-also", "See also"),
+    }
+}
+
 fn relations(entry: ElementRef, book: &mut SectionBook) {
-    select_all(entry, "span.xrefs").into_iter().filter(outside_idioms).for_each(|xrefs| {
-        let prefix = select_first(xrefs, "span.prefix").map(text_of).unwrap_or_default().to_lowercase();
-        let (key, label) = match prefix.as_str() {
-            "synonym" => ("synonym", "Synonyms"),
-            "opposite" => ("antonym", "Antonyms"),
-            _ => ("see-also", "See also"),
-        };
-        book.add(key, label, references_in(xrefs));
-    });
+    select_all(entry, "span.xrefs")
+        .into_iter()
+        .filter(outside_idioms)
+        .filter(|xrefs| !has_ancestor_class(*xrefs, "sense"))
+        .for_each(|xrefs| {
+            let prefix = select_first(xrefs, "span.prefix").map(text_of).unwrap_or_default();
+            let (key, label) = relation_kind(&prefix);
+            book.add(key, label, references_in(xrefs));
+        });
+}
+
+pub fn terms_in(scope: ElementRef) -> Vec<RelationTerm> {
+    references_in(scope)
+        .into_iter()
+        .map(|item| RelationTerm { text: item.text, link: item.link, relevance: None })
+        .collect()
 }
 
 fn references_in(scope: ElementRef) -> Vec<SectionItem> {
