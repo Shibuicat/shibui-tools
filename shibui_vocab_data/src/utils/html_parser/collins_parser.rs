@@ -29,7 +29,7 @@ impl HtmlParser for CollinsHtmlParser {
         let word = select_first(blocks[0], "h2.h2_entry span.orth").map(text_of).ok_or_else(|| missing_headword(root))?;
         let mut parsed = unique_keys(blocks.iter().map(|block| parsed_block(*block)).filter(Parsed::has_content).collect());
         if parsed.is_empty() {
-            bail!(layout_changed());
+            bail!(no_definition(root));
         }
         let primary = parsed.remove(0);
 
@@ -39,7 +39,7 @@ impl HtmlParser for CollinsHtmlParser {
             ..WordDefinition::new(word, primary.classes, primary.sections)
         };
         if !definition.has_meanings() {
-            bail!(layout_changed());
+            bail!(no_definition(root));
         }
         Ok(definition)
     }
@@ -234,6 +234,14 @@ fn audio_of(sound: ElementRef) -> Option<String> {
 
 fn missing_blocks(html: &str) -> anyhow::Error {
     if html.contains(NOT_FOUND_TEXT) {
+        anyhow::Error::new(WordNotFoundError)
+    } else {
+        layout_changed()
+    }
+}
+
+fn no_definition(root: ElementRef) -> anyhow::Error {
+    if select_first(root, "div.dictentry .xr").is_some() {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

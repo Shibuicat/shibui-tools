@@ -116,3 +116,12 @@ fn a_redirect_to_a_compound_phrase_page_without_an_entry_headword_is_not_found()
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_spelling_variant_that_only_points_to_another_word_is_not_found() {
+    let html = r#"<html><head><title>ORGANISATION definition and meaning | Collins English Dictionary</title></head><body><div class="dictentry dictlink"><div class="cB-h"><h2 class="h2_entry"><span class="orth">organisation</span></h2></div><div class="content definitions cobuild br"><span class="xr"><a class="ref" href="/dictionary/english/organization">organization</a></span></div></div></body></html>"#;
+
+    let error = CollinsHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
