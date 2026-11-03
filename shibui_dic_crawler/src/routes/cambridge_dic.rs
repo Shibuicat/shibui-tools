@@ -48,7 +48,7 @@ pub async fn get_word(
 
     match result {
         Some(word) => {
-            println!("returned {:?}", &word);
+            println!("returned {} with {} classes", word.word, word.classes.len());
             Ok(Json(word))
         }
         None => Err((StatusCode::NOT_FOUND, "Word doesn't exist".to_string())),

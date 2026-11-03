@@ -82,3 +82,21 @@ fn page_without_the_entry_container_and_without_the_not_found_title_is_a_layout_
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_none());
 }
+
+#[test]
+fn the_page_for_an_unknown_word_is_not_found_even_with_an_ordinary_title() {
+    let html = r#"<html><head><title>Hyperbarbarousness - Definition and More from the Free Merriam-Webster Dictionary</title></head><body><h1 class="mispelled-word">&ldquo;hyperbarbarousness&rdquo;</h1><p>The word you&rsquo;ve entered isn&rsquo;t in the dictionary.</p></body></html>"#;
+
+    let error = MerriamWebsterHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
+
+#[test]
+fn an_inflected_form_that_only_points_to_its_base_word_is_not_found() {
+    let html = r#"<html><head><title>WAS Definition &amp; Meaning - Merriam-Webster</title></head><body><div id="left-content"><div class="entry-word-section-container"><h1 class="hword">was</h1><p class="cxl-ref">past tense first- and third-person singular of be</p></div></div></body></html>"#;
+
+    let error = MerriamWebsterHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}

@@ -1,6 +1,7 @@
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Mutex;
 
@@ -130,6 +131,24 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
 }
 
 const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project)";
+const CONTACT_URL_VARIABLE: &str = "CRAWLER_CONTACT_URL";
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
+
+pub fn user_agent_with(contact_url: Option<&str>) -> String {
+    match contact_url.map(str::trim).filter(|url| !url.is_empty()) {
+        Some(url) => format!("Shibui-Dictionary-research/0.1 ({url}) reqwest"),
+        None => PLAIN_USER_AGENT.to_owned(),
+    }
+}
+
+pub fn retry_after(header: Option<&str>) -> Duration {
+    header
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(DEFAULT_RETRY_AFTER)
+        .min(MAX_RETRY_AFTER)
+}
 
 #[derive(Clone)]
 pub struct PlainHttpRequestMaker {
@@ -138,18 +157,34 @@ pub struct PlainHttpRequestMaker {
 
 impl PlainHttpRequestMaker {
     pub fn new() -> Self {
+        Self::with_contact(std::env::var(CONTACT_URL_VARIABLE).ok().as_deref())
+    }
+
+    pub fn with_contact(contact_url: Option<&str>) -> Self {
         Self {
             client: reqwest::Client::builder()
-                .user_agent(PLAIN_USER_AGENT)
+                .user_agent(user_agent_with(contact_url))
                 .build()
                 .unwrap_or_default(),
         }
+    }
+
+    async fn send(&self, url: &str) -> Result<reqwest::Response, FetchError> {
+        let response = self.client.get(url).send().await?;
+        if response.status() != reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Ok(response);
+        }
+
+        let wait = retry_after(response.headers().get(reqwest::header::RETRY_AFTER).and_then(|value| value.to_str().ok()));
+        println!("GET {url} -> status 429, waiting {} s as the server asked", wait.as_secs());
+        tokio::time::sleep(wait).await;
+        Ok(self.client.get(url).send().await?)
     }
 }
 
 impl HttpRequestMaker for PlainHttpRequestMaker {
     async fn get(&self, url: &str) -> Result<String, FetchError> {
-        let response = self.client.get(url).send().await?;
+        let response = self.send(url).await?;
         let status = response.status();
         println!("GET {url} -> status {status}");
         match status {
@@ -157,6 +192,29 @@ impl HttpRequestMaker for PlainHttpRequestMaker {
             reqwest::StatusCode::NOT_FOUND => Err(FetchError::NotFound(format!("{url} answered 404"))),
             status => Err(FetchError::Other(anyhow::anyhow!("{url} answered {status}"))),
         }
+    }
+}
+
+#[cfg(test)]
+mod plain_request_tests {
+    use super::*;
+
+    #[test]
+    fn the_user_agent_carries_the_contact_url_when_one_is_set() {
+        assert_eq!(
+            user_agent_with(Some(" https://example.org/about ")),
+            "Shibui-Dictionary-research/0.1 (https://example.org/about) reqwest"
+        );
+        assert_eq!(user_agent_with(None), PLAIN_USER_AGENT);
+        assert_eq!(user_agent_with(Some("  ")), PLAIN_USER_AGENT);
+    }
+
+    #[test]
+    fn retry_after_follows_the_server_but_never_waits_more_than_a_minute() {
+        assert_eq!(retry_after(Some("41")), Duration::from_secs(41));
+        assert_eq!(retry_after(Some("900")), Duration::from_secs(60));
+        assert_eq!(retry_after(Some("soon")), Duration::from_secs(30));
+        assert_eq!(retry_after(None), Duration::from_secs(30));
     }
 }
 

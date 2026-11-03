@@ -129,3 +129,21 @@ fn italic_words_inside_a_definition_stay_in_its_text_and_only_leading_italics_ar
     assert_eq!(meaning["labels"][0]["text"], "Law");
     assert_eq!(meaning["labels"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn a_page_that_names_the_word_but_has_no_entry_blocks_is_not_found() {
+    let html = r#"<html><head><title>JUGGINSES Definition &amp; Meaning | Dictionary.com</title></head><body><main><div class="box-headword-type"><h1 class="hdr-headword">jugginses</h1></div><div class="box-content-top">Search Results</div></main></body></html>"#;
+
+    let error = DictionaryComHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
+
+#[test]
+fn a_page_with_no_headword_and_no_entry_blocks_is_a_layout_failure() {
+    let html = "<html><head><title>Dictionary.com</title></head><body><main><p>Something else</p></main></body></html>";
+
+    let error = DictionaryComHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_none());
+}

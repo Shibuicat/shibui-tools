@@ -322,3 +322,12 @@ fn a_box_the_parser_does_not_know_is_kept_under_its_own_title() {
     assert_eq!(kept["label"], "Brand New");
     assert_eq!(item_texts(kept), vec!["Some text"]);
 }
+
+#[test]
+fn an_inflected_form_whose_only_sense_points_to_another_entry_is_not_found() {
+    let html = r#"<html><head><title>was verb</title></head><body><div id="entryContent"><div class="entry"><div class="top-container"><div class="top-g"><div class="webtop"><h1 class="headword">was</h1><span class="pos">verb</span></div></div></div><ol class="sense_single"><li class="sense"><span class="sensetop"><span class="xrefs"><a class="Ref" href="https://www.oxfordlearnersdictionaries.com/definition/english/be_1"><span class="xh">be</span></a></span></span></li></ol></div></div></body></html>"#;
+
+    let error = OxfordHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}

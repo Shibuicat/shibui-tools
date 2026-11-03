@@ -140,7 +140,8 @@ fn pronunciations_of(entry: ElementRef) -> Vec<WordPronounce> {
 
 fn missing_entries(root: ElementRef) -> anyhow::Error {
     let title = select_first(root, "title").map(text_of).unwrap_or_default().to_lowercase();
-    if title.contains("not found") || title.contains("404") {
+    let names_a_word = select_first(root, "h1.hdr-headword").is_some();
+    if title.contains("not found") || title.contains("404") || names_a_word {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

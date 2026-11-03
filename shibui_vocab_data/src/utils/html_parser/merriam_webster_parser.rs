@@ -38,7 +38,7 @@ impl HtmlParser for MerriamWebsterHtmlParser {
             )
         };
         if !definition.has_meanings() {
-            bail!(layout_changed());
+            bail!(WordNotFoundError);
         }
         Ok(definition)
     }
@@ -81,7 +81,7 @@ fn pronunciation_of(link: ElementRef) -> Option<WordPronounce> {
 
 fn missing_content(root: ElementRef) -> anyhow::Error {
     let title = select_first(root, "title").map(text_of).unwrap_or_default();
-    if title.contains(NOT_FOUND_TITLE) {
+    if title.contains(NOT_FOUND_TITLE) || select_first(root, "h1.mispelled-word").is_some() {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

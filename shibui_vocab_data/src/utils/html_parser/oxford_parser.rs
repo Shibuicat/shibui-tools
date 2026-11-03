@@ -49,7 +49,11 @@ impl HtmlParser for OxfordHtmlParser {
             )
         };
         if !definition.has_meanings() {
-            bail!(layout_changed());
+            bail!(if select_first(document.root_element(), "li.sense").is_some() {
+                anyhow::Error::new(WordNotFoundError)
+            } else {
+                layout_changed()
+            });
         }
         Ok(definition)
     }
