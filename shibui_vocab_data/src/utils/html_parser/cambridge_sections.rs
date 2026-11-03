@@ -2,7 +2,7 @@ use scraper::ElementRef;
 
 use super::cambridge_senses::{example_of, has_own_meanings, meaning_of};
 use super::cambridge_terms::{anchor_link, link_of, non_empty_text, xref_kind};
-use super::html_dom::{has_ancestor_class, has_class, select_all, select_first, text_of, text_without};
+use super::html_dom::{has_ancestor_class, has_class, select_all, select_first, text_of};
 use crate::scraper::{Section, SectionItem, WordUsageExample};
 
 pub fn sections_of(entry: ElementRef, class_name: &str) -> Vec<Section> {
@@ -110,19 +110,9 @@ fn derived_form(runon: ElementRef) -> Option<SectionItem> {
     })
 }
 
-fn vocabulary(entry: ElementRef) -> Vec<Section> {
-    select_all(entry, "div.daccord")
-        .into_iter()
-        .filter(|accordion| select_first(*accordion, "div.daccord_lt").is_some())
-        .filter_map(|accordion| {
-            let (key, label) = if has_class(accordion, "smartt") {
-                ("vocabulary", "SMART Vocabulary")
-            } else {
-                ("thesaurus", "Thesaurus")
-            };
-            section(key, label.to_owned(), accordion_items(accordion))
-        })
-        .collect()
+fn vocabulary(entry: ElementRef) -> Option<Section> {
+    let items = select_all(entry, "div.smartt").into_iter().flat_map(accordion_items).collect();
+    section("vocabulary", "SMART Vocabulary".to_owned(), items)
 }
 
 fn topics(entry: ElementRef) -> Option<Section> {
@@ -161,12 +151,6 @@ fn vocabulary_item(li: ElementRef, topic: Option<String>) -> Option<SectionItem>
         link_kind,
         label: topic,
         description: non_empty_text(select_first(li, "span.pos")),
-        examples: select_all(li, ".dexample")
-            .into_iter()
-            .map(|example| text_without(example, &|part| has_class(part, "lab")))
-            .filter(|example| !example.is_empty())
-            .map(WordUsageExample::plain)
-            .collect(),
         ..SectionItem::new(text, None)
     })
 }

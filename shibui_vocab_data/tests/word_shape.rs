@@ -80,7 +80,7 @@ fn every_new_field_is_written_in_camel_case_when_present() {
     meaning.topics = vec![Topic { text: "Law".to_owned(), level: Some("C1".to_owned()), link: None }];
     meaning.relations = vec![Relation {
         kind: "antonym".to_owned(),
-        terms: vec![RelationTerm { text: "keep".to_owned(), link: Some("keep".to_owned()), relevance: None }],
+        terms: vec![RelationTerm { text: "keep".to_owned(), link: Some("keep".to_owned()), relevance: None, examples: Vec::new() }],
     }];
     let mut sub_meaning = WordExplanation::new("to give up control".to_owned(), Vec::new());
     sub_meaning.examples = vec![WordUsageExample {

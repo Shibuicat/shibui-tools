@@ -357,16 +357,16 @@ fn a_header_with_two_parts_of_speech_keeps_both() {
 }
 
 #[test]
-fn the_thesaurus_box_keeps_its_words_and_example_sentences() {
+fn the_thesaurus_box_is_a_relation_of_its_meaning_with_an_example_for_each_word() {
     let thesaurus = r#"<div class="def-block ddef_block"><div class="ddef_h"><div class="def ddef_d db">to go:</div></div><div class="def-body ddef_b"><div class="daccord fs16"><amp-accordion><section><header class="ca_h">Thesaurus: synonyms, antonyms, and examples</header><div class="daccord_b"><div class="daccord_lt"><a href="/thesaurus/articles/leave">to leave</a></div><div class="daccord_lb"><ul><li class="had t-i"><a href="/thesaurus/depart">depart</a><span class="ti lml-5"><span class="example dexample"><span class="lab dlab"><span class="region dregion">UK</span> </span>The train departs at noon.</span></span></li></ul></div></div></section></amp-accordion></div></div></div>"#;
 
     let definition = as_json(&parse(&entry_with_sense(thesaurus)).unwrap());
 
-    let section = definition["sections"].as_array().unwrap().iter().find(|s| s["key"] == "thesaurus").unwrap();
-    assert_eq!(section["items"][0]["text"], "depart");
-    assert_eq!(section["items"][0]["link"], "/thesaurus/depart");
-    assert_eq!(section["items"][0]["label"], "to leave");
-    assert_eq!(section["items"][0]["examples"][0]["text"], "The train departs at noon.");
+    let meaning = &definition["classes"][0]["definitions"][0]["contexts"][0]["meanings"][0];
+    assert_eq!(meaning["relations"][0]["kind"], "thesaurus");
+    assert_eq!(meaning["relations"][0]["terms"][0]["text"], "depart");
+    assert_eq!(meaning["relations"][0]["terms"][0]["examples"][0]["text"], "The train departs at noon.");
+    assert!(definition["sections"].as_array().map_or(true, |sections| sections.iter().all(|s| s["key"] != "thesaurus")));
 }
 
 #[test]

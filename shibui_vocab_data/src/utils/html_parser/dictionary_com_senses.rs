@@ -96,6 +96,7 @@ fn relations_of(item: ElementRef) -> Vec<Relation> {
                     text: text_of(anchor),
                     link: anchor.value().attr("href").map(str::to_owned),
                     relevance: None,
+                    examples: Vec::new(),
                 })
                 .filter(|term| !term.text.is_empty())
                 .collect::<Vec<_>>();

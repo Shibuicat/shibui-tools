@@ -134,6 +134,7 @@ fn synonyms_of(thes: ElementRef) -> Option<Relation> {
                     .unwrap_or_else(|| text_without(term, &|part| has_class(part, "lbl"))),
                 link: anchor.and_then(|a| a.value().attr("href")).map(str::to_owned),
                 relevance: None,
+                examples: Vec::new(),
             }
         })
         .filter(|term| !term.text.is_empty())

@@ -256,6 +256,8 @@ pub struct RelationTerm {
     pub link: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relevance: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<WordUsageExample>,
 }
 
 #[derive(Debug, Serialize)]

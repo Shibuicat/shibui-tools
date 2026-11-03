@@ -192,10 +192,34 @@ fn relations_of(block: ElementRef) -> Vec<Relation> {
             let terms = select_all(xref, "div.item").into_iter().filter_map(term_of).collect::<Vec<_>>();
             (!terms.is_empty()).then(|| xref_kind(xref).map(|kind| Relation { kind, terms })).flatten()
         })
+        .chain(thesaurus_relation(block))
         .collect()
+}
+
+fn thesaurus_relation(block: ElementRef) -> Option<Relation> {
+    let terms = select_all(block, "div.daccord li.t-i")
+        .into_iter()
+        .filter_map(thesaurus_term)
+        .collect::<Vec<_>>();
+    (!terms.is_empty()).then(|| Relation { kind: "thesaurus".to_owned(), terms })
+}
+
+fn thesaurus_term(item: ElementRef) -> Option<RelationTerm> {
+    let text = non_empty_text(select_first(item, "a"))?;
+    Some(RelationTerm {
+        text,
+        link: None,
+        relevance: None,
+        examples: select_all(item, ".dexample")
+            .into_iter()
+            .map(|example| text_without(example, &|part| has_class(part, "lab")))
+            .filter(|example| !example.is_empty())
+            .map(WordUsageExample::plain)
+            .collect(),
+    })
 }
 
 fn term_of(item: ElementRef) -> Option<RelationTerm> {
     let text = non_empty_text(select_first(item, "span.x-h"))?;
-    Some(RelationTerm { link: anchor_link(item, &text).0, text, relevance: None })
+    Some(RelationTerm { link: anchor_link(item, &text).0, text, relevance: None, examples: Vec::new() })
 }

@@ -112,7 +112,7 @@ fn relations(entry: ElementRef, book: &mut SectionBook) {
 pub fn terms_in(scope: ElementRef) -> Vec<RelationTerm> {
     references_in(scope)
         .into_iter()
-        .map(|item| RelationTerm { text: item.text, link: item.link, relevance: None })
+        .map(|item| RelationTerm { text: item.text, link: item.link, relevance: None, examples: Vec::new() })
         .collect()
 }
 
