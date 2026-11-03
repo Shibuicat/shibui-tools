@@ -125,3 +125,16 @@ fn a_spelling_variant_that_only_points_to_another_word_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_page_whose_entries_sit_in_one_element_that_is_both_dictionaries_and_dictionary_keeps_them_in_the_fragment() {
+    let html = std::fs::read_to_string("tests/fixtures/collins_recommending.html").unwrap();
+
+    let first = CollinsHtmlParser.parse(&html).unwrap();
+    let fragment = first.extracted_html.clone().unwrap();
+    let again = CollinsHtmlParser.parse(&fragment).unwrap();
+
+    assert!(fragment.contains("dictentry"));
+    assert!(fragment.len() > 1000);
+    assert_eq!(serde_json::to_value(&first).unwrap(), serde_json::to_value(&again).unwrap());
+}
