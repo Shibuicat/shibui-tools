@@ -9,6 +9,7 @@ use super::{HtmlParser, WordNotFoundError};
 use crate::scraper::{Class, Region, WordClass, WordDefinition, WordForm, WordPronounce};
 
 const NOT_FOUND_TITLE: &str = "Result Not Found";
+const OTHER_SECTIONS: [&str; 1] = ["/slang/"];
 const UNKNOWN_CLASS: &str = "unknown";
 const AUDIO_HOST: &str = "https://media.merriam-webster.com/audio/prons/en";
 
@@ -81,7 +82,10 @@ fn pronunciation_of(link: ElementRef) -> Option<WordPronounce> {
 
 fn missing_content(root: ElementRef) -> anyhow::Error {
     let title = select_first(root, "title").map(text_of).unwrap_or_default();
-    if title.contains(NOT_FOUND_TITLE) || select_first(root, "h1.mispelled-word").is_some() {
+    let is_other_section = select_first(root, "link[rel=canonical]")
+        .and_then(|link| link.value().attr("href"))
+        .is_some_and(|href| OTHER_SECTIONS.iter().any(|section| href.contains(section)));
+    if title.contains(NOT_FOUND_TITLE) || select_first(root, "h1.mispelled-word").is_some() || is_other_section {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()

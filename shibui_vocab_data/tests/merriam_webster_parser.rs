@@ -109,3 +109,12 @@ fn a_partial_matches_page_that_only_lists_other_entries_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn a_word_that_redirects_to_the_slang_section_is_not_found() {
+    let html = r#"<html><head><title>WEBTOON Slang Meaning | Merriam-Webster</title><link rel="canonical" href="https://www.merriam-webster.com/slang/webtoon"/></head><body><main><h1>webtoon</h1></main></body></html>"#;
+
+    let error = MerriamWebsterHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
