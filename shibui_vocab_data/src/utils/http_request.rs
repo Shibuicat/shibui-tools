@@ -131,7 +131,7 @@ impl HttpRequestMaker for DefaultHttpRequestMaker {
 }
 
 const PLAIN_USER_AGENT: &str = "Shibui-Dictionary-research/0.1 (personal study project)";
-const CONTACT_URL_VARIABLE: &str = "CRAWLER_CONTACT_URL";
+const CONTACT_VARIABLE: &str = "CRAWLER_CONTACT";
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
 const DEFAULT_RETRY_AFTER: Duration = Duration::from_secs(30);
 
@@ -157,7 +157,7 @@ pub struct PlainHttpRequestMaker {
 
 impl PlainHttpRequestMaker {
     pub fn new() -> Self {
-        Self::with_contact(std::env::var(CONTACT_URL_VARIABLE).ok().as_deref())
+        Self::with_contact(std::env::var(CONTACT_VARIABLE).ok().as_deref())
     }
 
     pub fn with_contact(contact_url: Option<&str>) -> Self {
