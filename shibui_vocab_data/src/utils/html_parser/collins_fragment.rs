@@ -8,8 +8,15 @@ const NOISE_TAGS: [&str; 4] = ["svg", "img", "iframe", "video"];
 const NOISE_CLASSES: [&str; 4] = ["socialButtons", "contentslot", "am-dictionary_long", "video"];
 
 pub fn clean_entries(root: ElementRef) -> String {
-    let nested = select_all(root, "div.dictionaries > div.dictionary");
-    let wrappers = if nested.is_empty() { select_all(root, "div.dictionaries") } else { nested };
+    let wrappers = [
+        "div.dictionaries > div.dictionary",
+        "div.dictionaries",
+        "div.dictentry",
+    ]
+    .into_iter()
+    .map(|selector| select_all(root, selector))
+    .find(|found| !found.is_empty())
+    .unwrap_or_default();
     let blocks = wrappers
         .into_iter()
         .map(|block| clean_html_with(block, &KEPT_ATTRIBUTES, &is_noise))

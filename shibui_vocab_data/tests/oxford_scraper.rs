@@ -118,3 +118,38 @@ async fn the_kept_fragment_is_stored_and_used_instead_of_a_second_request() {
     assert_eq!(maker.requested().len(), 1);
     assert_eq!(again.word, "abandon");
 }
+
+#[derive(Clone)]
+struct ShellParser;
+
+impl shibui_vocab_data::utils::html_parser::HtmlParser for ShellParser {
+    type Output = shibui_vocab_data::scraper::WordDefinition;
+
+    fn parse(&self, html: &str) -> anyhow::Result<Self::Output> {
+        if html == "page" {
+            Ok(shibui_vocab_data::scraper::WordDefinition {
+                extracted_html: Some("<div id=\"empty\"></div>".to_owned()),
+                ..shibui_vocab_data::scraper::WordDefinition::new("word".to_owned(), Vec::new(), Vec::new())
+            })
+        } else {
+            Err(anyhow::anyhow!("no readable entry"))
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_kept_fragment_that_can_not_be_read_back_is_not_saved() {
+    let dir = std::env::temp_dir().join(format!("scraper-shell-{}", std::process::id()));
+    let maker = FakeRequestMaker::new(&[("https://example.test/word", Canned::Html("page".to_owned()))]);
+    let scraper = shibui_vocab_data::scraper::page_scraper::PageScraper::with_parts(
+        maker,
+        ShellParser,
+        |word| format!("https://example.test/{word}"),
+        dir.clone(),
+    );
+
+    let result = scraper.fetch("word").await.unwrap();
+
+    assert!(result.is_some());
+    assert!(!dir.join("word.html").exists());
+}

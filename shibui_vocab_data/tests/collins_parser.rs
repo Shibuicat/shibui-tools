@@ -159,3 +159,15 @@ fn the_headword_comes_from_the_first_block_that_has_one_even_when_an_examples_bl
 
     assert_eq!(definition.word, "monkeypox");
 }
+
+#[test]
+fn a_page_with_no_wrapper_around_its_entries_still_keeps_them_in_the_fragment() {
+    let html = r#"<html><head><title>MONKEYPOX definition and meaning | Collins English Dictionary</title></head><body><div class="page"><div class="dictionary Scientific dictentry"><h1 class="entry_title">Example sentences monkeypox</h1></div><div class="dictionary Collins_Eng_Dict dictentry"><h2 class="h2_entry"><span class="orth">monkeypox</span></h2><div class="content definitions"><div class="hom"><span class="gramGrp pos">uncountable noun</span><div class="sense"><div class="def">a viral disease</div></div></div></div></div></div></body></html>"#;
+
+    let first = CollinsHtmlParser.parse(html).unwrap();
+    let fragment = first.extracted_html.clone().unwrap();
+    let again = CollinsHtmlParser.parse(&fragment).unwrap();
+
+    assert!(fragment.contains("a viral disease"));
+    assert_eq!(serde_json::to_value(&first).unwrap(), serde_json::to_value(&again).unwrap());
+}

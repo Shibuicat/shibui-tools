@@ -83,7 +83,11 @@ impl<R: HttpRequestMaker, P: HtmlParser<Output = WordDefinition>> PageScraper<R,
             None => return Ok(None),
         };
         if let Some(extracted_html) = &result.extracted_html {
-            self.save_extracted_html(&cache_path, extracted_html).await;
+            if self.html_parser.parse(extracted_html).is_ok() {
+                self.save_extracted_html(&cache_path, extracted_html).await;
+            } else {
+                eprintln!("Not saving the page of {word}: the kept fragment can not be read back");
+            }
         }
         Ok(Some(result))
     }
