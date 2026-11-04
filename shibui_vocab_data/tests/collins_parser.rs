@@ -150,3 +150,12 @@ fn an_entry_whose_only_senses_sit_under_a_phrase_form_uses_them_as_its_meanings(
     assert_eq!(contexts[0]["meanings"].as_array().unwrap().len(), 2);
     assert_eq!(contexts[0]["meanings"][1]["explanation"], "the 13 states forming the original United States");
 }
+
+#[test]
+fn the_headword_comes_from_the_first_block_that_has_one_even_when_an_examples_block_comes_first() {
+    let html = r#"<html><head><title>MONKEYPOX definition and meaning | Collins English Dictionary</title></head><body><div class="page"><div class="dictionary Scientific dictentry"><h1 class="entry_title">Example sentences monkeypox</h1></div><div class="dictionary Collins_Eng_Dict dictentry"><h2 class="h2_entry"><span class="orth">monkeypox</span></h2><div class="content definitions"><div class="hom"><span class="gramGrp pos">uncountable noun</span><div class="sense"><div class="def">a viral disease</div></div></div></div></div></div></body></html>"#;
+
+    let definition = CollinsHtmlParser.parse(html).unwrap();
+
+    assert_eq!(definition.word, "monkeypox");
+}

@@ -26,7 +26,11 @@ impl HtmlParser for CollinsHtmlParser {
             bail!(missing_blocks(html_content));
         }
 
-        let word = select_first(blocks[0], "h2.h2_entry span.orth").map(text_of).ok_or_else(|| missing_headword(root))?;
+        let word = blocks
+            .iter()
+            .find_map(|block| select_first(*block, "h2.h2_entry span.orth"))
+            .map(text_of)
+            .ok_or_else(|| missing_headword(root))?;
         let mut parsed = unique_keys(blocks.iter().map(|block| parsed_block(*block)).filter(Parsed::has_content).collect());
         if parsed.is_empty() {
             bail!(no_definition(root));
