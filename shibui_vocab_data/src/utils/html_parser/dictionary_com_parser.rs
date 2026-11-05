@@ -12,6 +12,7 @@ const GROUP_ID_PREFIX: &str = "id-sec-entry-group-";
 const PRIMARY_GROUP: &str = "dcom";
 const UNKNOWN_CLASS: &str = "unknown";
 const NOT_IN_DICTIONARY_TEXT: &str = "is not in our dictionary";
+const MISSPELLING_REDIRECT_MARKER: &str = "\"mismatch_type\":\"misspelling\"";
 
 #[derive(Clone)]
 pub struct DictionaryComHtmlParser;
@@ -20,6 +21,9 @@ impl HtmlParser for DictionaryComHtmlParser {
     type Output = WordDefinition;
 
     fn parse(&self, html_content: &str) -> anyhow::Result<Self::Output> {
+        if html_content.contains(MISSPELLING_REDIRECT_MARKER) {
+            bail!(WordNotFoundError);
+        }
         let document = Html::parse_document(html_content);
         let root = document.root_element();
         let mut groups = select_all(root, "section.sec-item-entry-group")

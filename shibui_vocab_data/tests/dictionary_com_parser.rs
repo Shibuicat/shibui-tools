@@ -165,3 +165,43 @@ fn a_page_that_only_offers_an_ai_guess_for_an_unknown_word_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+fn redirected_page(mismatch_type: &str) -> String {
+    format!(
+        r#"<html><body><div class="sec-redirect-tip mismatch-result-card">Showing results for <strong>quira</strong>. Search instead for <a class="lk-search-instead" href="/browse/quia?noredirect=true">quia</a>.</div>
+        <section class="sec-item-entry-group" id="id-sec-entry-group-dcom">
+        <div class="box-item-entry"><h1 class="hdr-headword">quira</h1>
+        <div class="box-posb-content"><div class="box-posb"><div class="box-pos-label"><h2>noun</h2></div>
+        <ol class="list-definition"><li class="item-definition"><p class="txt-variant-label-short"></p>
+        <ol class="list-sub-definition">
+        <li class="item-sub-definition"><p class="txt-variant-label-short">any of several tall hardwood trees.</p></li>
+        <li class="item-sub-definition"><p class="txt-variant-label-short">the wood of such a tree.</p></li>
+        </ol></li></ol></div></div></div></section>
+        <script>{{"cards_shown":["mismatch"],"mismatch_type":"{mismatch_type}","image_present":false}}</script></body></html>"#
+    )
+}
+
+#[test]
+fn a_page_that_autocorrects_a_misspelling_to_another_word_is_not_found() {
+    let error = parse(&redirected_page("misspelling")).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
+
+#[test]
+fn a_page_that_redirects_an_inflected_form_to_its_base_word_is_still_read() {
+    let definition = serde_json::to_value(parse(&redirected_page("lemmatization")).unwrap()).unwrap();
+
+    assert_eq!(definition["word"], "quira");
+}
+
+#[test]
+fn a_definition_whose_text_is_only_in_its_sub_definitions_gives_those_as_the_meanings() {
+    let definition = serde_json::to_value(parse(&redirected_page("lemmatization")).unwrap()).unwrap();
+
+    let texts = meanings(&definition["classes"][0])
+        .iter()
+        .map(|meaning| meaning["explanation"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(texts, vec!["any of several tall hardwood trees.", "the wood of such a tree."]);
+}

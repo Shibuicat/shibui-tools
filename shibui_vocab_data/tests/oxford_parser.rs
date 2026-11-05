@@ -340,3 +340,12 @@ fn a_headword_that_only_has_phrasal_verbs_is_not_found() {
 
     assert!(error.downcast_ref::<WordNotFoundError>().is_some());
 }
+
+#[test]
+fn an_abbreviation_that_only_points_to_the_full_entry_is_not_found() {
+    let html = r#"<html><head><title>NDE abbreviation</title></head><body><div id="entryContent"><div class="entry"><div class="top-container"><div class="top-g"><div class="webtop"><h1 class="headword">NDE</h1><span class="pos">abbreviation</span><span class="xrefs"><span class="prefix">=</span> <a class="Ref" href="https://www.oxfordlearnersdictionaries.com/definition/english/near-death-experience"><span class="xh">near-death experience</span></a></span></div></div></div></div></div></body></html>"#;
+
+    let error = OxfordHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}

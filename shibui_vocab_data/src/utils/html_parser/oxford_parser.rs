@@ -50,7 +50,10 @@ impl HtmlParser for OxfordHtmlParser {
         };
         if !definition.has_meanings() {
             let root = document.root_element();
-            bail!(if select_first(root, "li.sense").is_some() || select_first(root, "aside.phrasal_verb_links").is_some() {
+            let only_points_elsewhere = select_first(root, "li.sense").is_some()
+                || select_first(root, "aside.phrasal_verb_links").is_some()
+                || select_first(webtop, "span.xrefs").is_some();
+            bail!(if only_points_elsewhere {
                 anyhow::Error::new(WordNotFoundError)
             } else {
                 layout_changed()

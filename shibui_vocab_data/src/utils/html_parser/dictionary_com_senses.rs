@@ -10,7 +10,7 @@ pub fn definition_of(posb: ElementRef) -> ClassDefinition {
         contexts: select_all(posb, "ol.list-definition")
             .into_iter()
             .flat_map(|list| list_items(list, "item-definition"))
-            .filter_map(meaning_of)
+            .flat_map(meanings_of)
             .map(|meaning| WordContext { description: None, meanings: vec![meaning] })
             .collect(),
     }
@@ -22,12 +22,12 @@ fn list_items<'a>(list: ElementRef<'a>, class: &str) -> Vec<ElementRef<'a>> {
         .collect()
 }
 
-fn meaning_of(item: ElementRef) -> Option<WordExplanation> {
+fn meanings_of(item: ElementRef) -> Vec<WordExplanation> {
     let (labels, text) = label_and_text(item);
     let sub_meanings = child_elements(item)
         .filter(|child| has_class(*child, "list-sub-definition"))
         .flat_map(|list| list_items(list, "item-sub-definition"))
-        .filter_map(meaning_of)
+        .flat_map(meanings_of)
         .collect::<Vec<_>>();
 
     let heading_only = text.is_empty() && !sub_meanings.is_empty();
@@ -37,14 +37,14 @@ fn meaning_of(item: ElementRef) -> Option<WordExplanation> {
         text
     };
     if explanation.is_empty() {
-        return None;
+        return sub_meanings;
     }
 
     let mut meaning = WordExplanation::new(explanation, examples_of(item));
     meaning.labels = if heading_only { Vec::new() } else { labels };
     meaning.sub_meanings = sub_meanings;
     meaning.relations = relations_of(item);
-    Some(meaning)
+    vec![meaning]
 }
 
 fn label_and_text(item: ElementRef) -> (Vec<Label>, String) {
