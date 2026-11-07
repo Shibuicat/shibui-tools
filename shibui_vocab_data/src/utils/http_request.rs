@@ -276,6 +276,38 @@ impl HttpRequestMaker for ChallengeHttpRequestMaker {
         if solution.response.contains("Just a moment...") {
             return Err(FetchError::Other(anyhow::anyhow!("Endpoint {url} returned a Cloudflare challenge page")));
         }
+        if let Some(code) = browser_error_code(&solution.response) {
+            return Err(FetchError::Other(anyhow::anyhow!("Endpoint {url} showed the browser error {code}")));
+        }
         Ok(solution.response)
+    }
+}
+
+const BROWSER_ERROR_MARKER: &str = "class=\"neterror\"";
+
+fn browser_error_code(response: &str) -> Option<&str> {
+    if !response.contains(BROWSER_ERROR_MARKER) {
+        return None;
+    }
+    let start = response.find("ERR_")?;
+    let code = &response[start..];
+    let end = code.find(|c: char| !(c.is_ascii_uppercase() || c == '_')).unwrap_or(code.len());
+    Some(&code[..end])
+}
+
+#[cfg(test)]
+mod browser_error_tests {
+    use super::*;
+
+    #[test]
+    fn a_browser_error_page_gives_its_error_code() {
+        let page = r#"<body class="neterror"><div>redirected you too many times.</div><div>ERR_TOO_MANY_REDIRECTS</div></body>"#;
+
+        assert_eq!(browser_error_code(page), Some("ERR_TOO_MANY_REDIRECTS"));
+    }
+
+    #[test]
+    fn a_normal_page_is_not_a_browser_error() {
+        assert_eq!(browser_error_code("<body><h1>aydin</h1><p>ERR_FOO in text</p></body>"), None);
     }
 }
