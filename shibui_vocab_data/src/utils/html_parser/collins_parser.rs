@@ -9,6 +9,7 @@ use super::{HtmlParser, WordNotFoundError};
 use crate::scraper::{Class, Group, Region, WordClass, WordDefinition, WordForm, WordPronounce};
 
 const NOT_FOUND_TEXT: &str = "Sorry, no results for";
+const WORD_SUGGESTION_PATH: &str = "/submission/";
 const DICTIONARY_MARKERS: [&str; 4] = ["dictionary", "dictentry", "dictionaries", "dictlink"];
 const UNKNOWN_CLASS: &str = "unknown";
 
@@ -23,7 +24,7 @@ impl HtmlParser for CollinsHtmlParser {
         let root = document.root_element();
         let blocks = select_all(root, "div.dictentry");
         if blocks.is_empty() {
-            bail!(missing_blocks(html_content));
+            bail!(missing_blocks(root, html_content));
         }
 
         let word = blocks
@@ -236,12 +237,18 @@ fn audio_of(sound: ElementRef) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn missing_blocks(html: &str) -> anyhow::Error {
-    if html.contains(NOT_FOUND_TEXT) {
+fn missing_blocks(root: ElementRef, html: &str) -> anyhow::Error {
+    if html.contains(NOT_FOUND_TEXT) || is_word_suggestion(root) {
         anyhow::Error::new(WordNotFoundError)
     } else {
         layout_changed()
     }
+}
+
+fn is_word_suggestion(root: ElementRef) -> bool {
+    select_first(root, "link[rel=canonical]")
+        .and_then(|link| link.value().attr("href"))
+        .is_some_and(|href| href.contains(WORD_SUGGESTION_PATH))
 }
 
 fn no_definition(root: ElementRef) -> anyhow::Error {

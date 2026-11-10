@@ -102,6 +102,15 @@ fn a_page_with_the_no_results_text_is_not_found() {
 }
 
 #[test]
+fn a_word_that_redirects_to_a_user_submitted_word_suggestion_page_is_not_found() {
+    let html = r#"<html><head><title>Definition of opsal | New Word Suggestion | Collins English Dictionary</title><link rel="canonical" href="https://www.collinsdictionary.com/submission/426165/opsal"></head><body><h1>opsal</h1><p>New Word Suggestion</p></body></html>"#;
+
+    let error = CollinsHtmlParser.parse(html).unwrap_err();
+
+    assert!(error.downcast_ref::<WordNotFoundError>().is_some());
+}
+
+#[test]
 fn a_page_without_entries_and_without_the_text_is_a_layout_change() {
     let error = parse("<html><body><p>Hello</p></body></html>").unwrap_err();
 
